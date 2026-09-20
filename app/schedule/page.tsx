@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, EmptyState, Tabs } from "@/components/ui";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, EmptyState, Tabs, inputClass } from "@/components/ui";
 import { fmtDate, TODAY } from "@/lib/utils";
 import { ScheduleTask } from "@/lib/types";
 
@@ -226,6 +226,13 @@ export default function SchedulePage() {
   );
 }
 
+interface TaskRow {
+  key: string;
+  text: string;
+}
+
+const blankRow = (): TaskRow => ({ key: Math.random().toString(36).slice(2), text: "" });
+
 function TaskForm({ onClose }: { onClose: () => void }) {
   const { db, update } = useStore();
   const [form, setForm] = useState({
@@ -233,28 +240,70 @@ function TaskForm({ onClose }: { onClose: () => void }) {
     farmId: db.farms[0]?.id ?? "",
     plotId: "",
     workerId: db.workers[0]?.id ?? "",
-    task: "",
     repeatDays: "1",
   });
+  const [rows, setRows] = useState<TaskRow[]>([blankRow()]);
+  // live input elements by row key, so focus can be moved imperatively
+  const inputs = useRef(new Map<string, HTMLInputElement>());
+  // a row created this render that should take focus once it exists
+  const pendingFocus = useRef<string | null>(null);
+
+  useEffect(() => {
+    const key = pendingFocus.current;
+    if (!key) return;
+    inputs.current.get(key)?.focus();
+    pendingFocus.current = null;
+  }, [rows]);
 
   const plots = db.plots.filter((p) => p.farmId === form.farmId);
+  const filled = rows.filter((r) => r.text.trim());
+  const repeat = Math.max(1, Number(form.repeatDays) || 1);
+  const totalTasks = filled.length * repeat;
+
+  /** Typing in the last row grows the list, so there is always a free row. */
+  const setText = (key: string, text: string) => {
+    setRows((prev) => {
+      const next = prev.map((r) => (r.key === key ? { ...r, text } : r));
+      const isLast = prev[prev.length - 1].key === key;
+      return isLast && text.trim() ? [...next, blankRow()] : next;
+    });
+  };
+
+  const addRow = () => {
+    const row = blankRow();
+    pendingFocus.current = row.key;
+    setRows((prev) => [...prev, row]);
+  };
+
+  const removeRow = (key: string) =>
+    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : [blankRow()]));
+
+  const onRowKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const next = rows[index + 1];
+    if (next) inputs.current.get(next.key)?.focus();
+    else addRow();
+  };
 
   const submit = () => {
-    if (!form.task) return;
-    const repeat = Math.max(1, Number(form.repeatDays) || 1);
+    if (filled.length === 0) return;
     const items: ScheduleTask[] = [];
-    for (let i = 0; i < repeat; i++) {
+    for (let day = 0; day < repeat; day++) {
       const d = new Date(form.date);
-      d.setDate(d.getDate() + i);
-      items.push({
-        id: newId("t"),
-        date: d.toISOString().slice(0, 10),
-        farmId: form.farmId,
-        plotId: form.plotId || undefined,
-        workerId: form.workerId,
-        task: form.task,
-        status: "Planned",
-      });
+      d.setDate(d.getDate() + day);
+      const date = d.toISOString().slice(0, 10);
+      for (const row of filled) {
+        items.push({
+          id: newId("t"),
+          date,
+          farmId: form.farmId,
+          plotId: form.plotId || undefined,
+          workerId: form.workerId,
+          task: row.text.trim(),
+          status: "Planned",
+        });
+      }
     }
     update("tasks", (list) => [...list, ...items]);
     onClose();
@@ -293,9 +342,58 @@ function TaskForm({ onClose }: { onClose: () => void }) {
             ))}
           </Select>
         </Field>
-        <Field label="Task">
-          <TextInput value={form.task} onChange={(e) => setForm({ ...form, task: e.target.value })} placeholder="e.g. Harvest chili, Spray round, Weeding" />
-        </Field>
+
+        <div>
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Tasks</span>
+          <div className="space-y-2">
+            {rows.map((row, i) => (
+              <div key={row.key} className="flex items-center gap-2">
+                <span className="w-4 shrink-0 text-right text-xs tnum text-muted">{i + 1}</span>
+                <input
+                  ref={(el) => {
+                    if (el) inputs.current.set(row.key, el);
+                    else inputs.current.delete(row.key);
+                  }}
+                  value={row.text}
+                  onChange={(e) => setText(row.key, e.target.value)}
+                  onKeyDown={(e) => onRowKeyDown(e, i)}
+                  placeholder={i === 0 ? "e.g. Harvest chili, Spray round, Weeding" : "Add another task"}
+                  aria-label={`Task ${i + 1}`}
+                  className={inputClass}
+                />
+                <button
+                  onClick={() => removeRow(row.key)}
+                  disabled={rows.length === 1 && !row.text}
+                  aria-label={`Remove task ${i + 1}`}
+                  className="shrink-0 px-1 text-muted transition-colors hover:text-critical disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={addRow} className="mt-2 text-xs font-medium text-accent hover:underline">
+            + Add task
+          </button>
+          <p className="mt-1 text-xs text-muted">
+            A new row appears as you type, or press Enter to add one.
+          </p>
+        </div>
+
+        {totalTasks > 0 && (
+          <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+            Will schedule <strong className="text-ink">{totalTasks}</strong>{" "}
+            {totalTasks === 1 ? "task" : "tasks"}
+            {repeat > 1 && (
+              <>
+                {" "}
+                — {filled.length} {filled.length === 1 ? "task" : "tasks"} × {repeat} days
+              </>
+            )}
+            .
+          </p>
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit}>Schedule</Button>
