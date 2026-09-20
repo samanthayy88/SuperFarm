@@ -327,7 +327,14 @@ export default function FarmsPage() {
                         {isOpen && (
                           <tr>
                             <td colSpan={10} className="border-b border-grid bg-surface-2 px-3 py-4">
-                              <CycleDetail plot={p} steps={steps} total={total} soFar={soFar} done={done} />
+                              <CycleDetail
+                                label={`${p.name}${p.variety ? ` · ${p.variety}` : ""}`}
+                                cycle={p.cycle}
+                                steps={steps}
+                                total={total}
+                                soFar={soFar}
+                                done={done}
+                              />
                             </td>
                           </tr>
                         )}
@@ -394,25 +401,24 @@ export default function FarmsPage() {
 /* ------------------------------ cycle detail ------------------------------ */
 
 function CycleDetail({
-  plot,
+  label,
+  cycle,
   steps,
   total,
   soFar,
   done,
 }: {
-  plot: Plot;
+  label: string;
+  cycle: PlotCycle;
   steps: ReturnType<typeof cycleSteps>;
   total: number | null;
   soFar: number | null;
   done: boolean;
 }) {
-  const missing = PLOT_STAGES.filter((s) => !plot.cycle?.[s]);
+  const missing = PLOT_STAGES.filter((s) => !cycle?.[s]);
   return (
     <div>
-      <p className="mb-3 text-xs font-semibold tracking-wide text-muted">
-        CROP CYCLE — {plot.name}
-        {plot.variety ? ` · ${plot.variety}` : ""}
-      </p>
+      <p className="mb-3 text-xs font-semibold tracking-wide text-muted">CROP CYCLE — {label}</p>
 
       {steps.length === 0 ? (
         <p className="text-sm text-muted">
@@ -463,16 +469,30 @@ function CycleDetail({
 
 /* ------------------------------ farm history ------------------------------ */
 
-function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }) {
-  const { db } = useStore();
-  const plots = db.plots.filter((p) => p.farmId === farm.id);
+type HistoryRow = { plot: Plot; record: PlotCycleRecord };
 
-  type Row = { plot: Plot; record: PlotCycleRecord };
-  const rows: Row[] = plots
+function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }) {
+  const { db, update } = useStore();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editRow, setEditRow] = useState<HistoryRow | null>(null);
+  const [deleteRow, setDeleteRow] = useState<HistoryRow | null>(null);
+
+  const plots = db.plots.filter((p) => p.farmId === farm.id);
+  const rows: HistoryRow[] = plots
     .flatMap((plot) => (plot.history ?? []).map((record) => ({ plot, record })))
     .sort((a, b) => (a.record.archivedAt < b.record.archivedAt ? 1 : -1));
 
+  const doDeleteRecord = (row: HistoryRow) => {
+    update("plots", (list) =>
+      list.map((p) =>
+        p.id === row.plot.id ? { ...p, history: (p.history ?? []).filter((r) => r.id !== row.record.id) } : p
+      )
+    );
+    setDeleteRow(null);
+  };
+
   return (
+    <>
     <Modal title={`Planting History — ${farm.name}`} onClose={onClose} wide>
       {rows.length === 0 ? (
         <EmptyState message="No completed cycles yet. Past plantings appear here once a plot starts a new cycle." />
@@ -480,47 +500,219 @@ function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }
         <Table>
           <thead>
             <tr>
+              <Th />
               <Th>Plot</Th>
               <Th>Crop</Th>
               <Th>Variety</Th>
+              <Th right>Size</Th>
               <Th>Managed by</Th>
-              <Th>Cycle</Th>
-              <Th right>Duration</Th>
-              <Th right>Archived</Th>
+              <Th>Stage</Th>
+              <Th right>Cycle</Th>
+              <Th>Status</Th>
+              <Th />
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ plot, record }) => {
+            {rows.map((row) => {
+              const { plot, record } = row;
               const crop = db.crops.find((c) => c.id === record.cropId)?.name ?? "—";
               const worker = db.workers.find((w) => w.id === record.workerId)?.name ?? "—";
               const steps = cycleSteps(record.cycle);
-              const duration = cycleDurationDays(record.cycle);
+              const stage = currentStage(record.cycle);
+              const total = cycleDurationDays(record.cycle);
+              const isOpen = expanded === record.id;
               return (
-                <tr key={record.id}>
+                <Fragment key={record.id}>
+                <tr>
+                  <Td>
+                    <button
+                      onClick={() => setExpanded(isOpen ? null : record.id)}
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? "Hide crop cycle" : "Show crop cycle"}
+                      className="flex h-6 w-6 items-center justify-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                    >
+                      <span aria-hidden>{isOpen ? "▾" : "▸"}</span>
+                    </button>
+                  </Td>
                   <Td className="font-medium text-ink">{plot.name}</Td>
                   <Td>{crop}</Td>
                   <Td>{record.variety || <span className="text-muted">—</span>}</Td>
+                  <Td right>{plot.sizeAcres} ac</Td>
                   <Td>{worker}</Td>
                   <Td>
-                    {steps.length > 0 ? (
-                      <span className="text-xs text-ink-2">
-                        {steps[0].label} {fmtDate(steps[0].date)} → {steps[steps.length - 1].label}{" "}
-                        {fmtDate(steps[steps.length - 1].date)}
-                      </span>
+                    {stage ? (
+                      <Badge tone={stage.stage === "fallow" ? "neutral" : "accent"}>{stage.label}</Badge>
+                    ) : (
+                      <span className="text-xs text-muted">no dates</span>
+                    )}
+                  </Td>
+                  <Td right>
+                    {total !== null ? (
+                      <>
+                        <span className="font-medium text-ink">{total} d</span>
+                        <p className="text-xs text-muted">complete</p>
+                      </>
                     ) : (
                       <span className="text-muted">—</span>
                     )}
                   </Td>
-                  <Td right>{duration !== null ? `${duration} d` : <span className="text-muted">—</span>}</Td>
-                  <Td right className="text-xs text-muted">
-                    {fmtDate(record.archivedAt)}
+                  <Td>
+                    <Badge tone="neutral">Archived</Badge>
+                    <p className="mt-0.5 text-xs text-muted">{fmtDate(record.archivedAt)}</p>
+                  </Td>
+                  <Td>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setEditRow(row)}
+                        className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteRow(row)}
+                        className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </Td>
                 </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={10} className="border-b border-grid bg-surface-2 px-3 py-4">
+                      <CycleDetail
+                        label={`${plot.name}${record.variety ? ` · ${record.variety}` : ""}`}
+                        cycle={record.cycle}
+                        steps={steps}
+                        total={total}
+                        soFar={null}
+                        done={true}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
         </Table>
       )}
+    </Modal>
+    {editRow && <HistoryRecordForm row={editRow} onClose={() => setEditRow(null)} />}
+    {deleteRow && (
+      <ConfirmDialog
+        title={`Delete this archived cycle?`}
+        message={`This ${db.crops.find((c) => c.id === deleteRow.record.cropId)?.name ?? ""} cycle recorded for “${deleteRow.plot.name}” will be permanently removed from History.`}
+        confirmLabel="Delete record"
+        onConfirm={() => doDeleteRecord(deleteRow)}
+        onClose={() => setDeleteRow(null)}
+      />
+    )}
+    </>
+  );
+}
+
+/* --------------------------- history record form --------------------------- */
+
+function HistoryRecordForm({ row, onClose }: { row: HistoryRow; onClose: () => void }) {
+  const { db, update } = useStore();
+  const { plot, record } = row;
+  const [form, setForm] = useState({
+    cropId: record.cropId,
+    variety: record.variety ?? "",
+    workerId: record.workerId,
+  });
+  const [cycle, setCycle] = useState<PlotCycle>(record.cycle);
+
+  const setStageDate = (stage: (typeof PLOT_STAGES)[number], value: string) =>
+    setCycle((c) => {
+      const next = { ...c };
+      if (value) next[stage] = value;
+      else delete next[stage];
+      return next;
+    });
+
+  const outOfOrder = PLOT_STAGES.filter((s, i) => {
+    if (!cycle[s]) return false;
+    const earlier = PLOT_STAGES.slice(0, i).filter((e) => cycle[e]);
+    return earlier.some((e) => (cycle[e] as string) > (cycle[s] as string));
+  });
+
+  const submit = () => {
+    update("plots", (list) =>
+      list.map((p) =>
+        p.id === plot.id
+          ? {
+              ...p,
+              history: (p.history ?? []).map((r) =>
+                r.id === record.id
+                  ? { ...r, cropId: form.cropId, variety: form.variety.trim() || undefined, workerId: form.workerId, cycle }
+                  : r
+              ),
+            }
+          : p
+      )
+    );
+    onClose();
+  };
+
+  return (
+    <Modal title={`Edit Archived Cycle — ${plot.name}`} onClose={onClose} wide>
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Crop">
+            <Select value={form.cropId} onChange={(e) => setForm({ ...form, cropId: e.target.value })}>
+              {db.crops.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Variety">
+            <TextInput
+              value={form.variety}
+              onChange={(e) => setForm({ ...form, variety: e.target.value })}
+              placeholder="e.g. Kulai Red, Bara F1"
+            />
+          </Field>
+          <Field label="Managed by worker">
+            <Select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
+              {db.workers.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+
+        <div className="rounded-lg border border-hairline bg-surface-2 p-3">
+          <p className="mb-1 text-xs font-semibold tracking-wide text-ink-2">CROP CYCLE DATES</p>
+          <p className="mb-3 text-xs text-muted">
+            This is an archived cycle — editing it only corrects the record, it will not reopen the plot.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {PLOT_STAGES.map((stage) => (
+              <Field key={stage} label={PLOT_STAGE_LABELS[stage]}>
+                <TextInput
+                  type="date"
+                  value={cycle[stage] ?? ""}
+                  onChange={(e) => setStageDate(stage, e.target.value)}
+                />
+              </Field>
+            ))}
+          </div>
+          <CycleSummary cycle={cycle} outOfOrder={outOfOrder} />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit}>Save changes</Button>
+        </div>
+      </div>
     </Modal>
   );
 }
