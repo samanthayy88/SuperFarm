@@ -10,11 +10,27 @@ const STORAGE_KEY = "farm-dashboard-db-v1";
 let clientState: DB | null = null;
 const listeners = new Set<() => void>();
 
+/**
+ * Brings saved records up to the current shape. Saves written before the
+ * crop-cycle fields existed carry a flat `plantedDate`; lift it into
+ * `cycle.planting` so those plots keep their date instead of losing it.
+ */
+function migrate(db: DB): DB {
+  return {
+    ...db,
+    plots: (db.plots ?? []).map((p) => {
+      const cycle = { ...(p.cycle ?? {}) };
+      if (!cycle.planting && p.plantedDate) cycle.planting = p.plantedDate;
+      return { ...p, cycle };
+    }),
+  };
+}
+
 function load(): DB {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     // merge over the seed so saves made before a new collection existed still load
-    if (raw) return { ...seedDB, ...(JSON.parse(raw) as Partial<DB>) };
+    if (raw) return migrate({ ...seedDB, ...(JSON.parse(raw) as Partial<DB>) });
   } catch {
     // corrupted save - fall back to the seed dataset
   }

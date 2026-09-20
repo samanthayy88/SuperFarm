@@ -253,3 +253,56 @@ export function Tabs({
     </div>
   );
 }
+
+/**
+ * Destructive confirmation that spells out what will be removed.
+ * `impacts` lists linked records the delete will also take with it, so the
+ * consequence is visible before the click rather than discovered afterwards.
+ */
+export function ConfirmDialog({
+  title,
+  message,
+  impacts = [],
+  confirmLabel = "Delete",
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  impacts?: string[];
+  confirmLabel?: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <p className="text-sm text-ink-2">{message}</p>
+
+      {impacts.length > 0 && (
+        <div className="mt-3 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2.5">
+          <p className="text-xs font-semibold text-critical">
+            This will also permanently delete linked records:
+          </p>
+          <ul className="mt-1.5 space-y-0.5">
+            {impacts.map((i) => (
+              <li key={i} className="text-xs text-critical">
+                • {i}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="mt-3 text-xs text-muted">This cannot be undone.</p>
+
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button variant="danger" onClick={onConfirm}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </Modal>
+  );
+}

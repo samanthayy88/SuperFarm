@@ -8,14 +8,42 @@ export interface Farm {
   notes?: string;
 }
 
+/** Crop-cycle milestones, in the order they occur in the field. */
+export const PLOT_STAGES = [
+  "sowing",
+  "planting",
+  "transplanting",
+  "flowering",
+  "harvesting",
+  "fallow",
+] as const;
+
+export type PlotStage = (typeof PLOT_STAGES)[number];
+
+export const PLOT_STAGE_LABELS: Record<PlotStage, string> = {
+  sowing: "Sowing",
+  planting: "Planting",
+  transplanting: "Transplanting",
+  flowering: "Flowering",
+  harvesting: "Harvesting",
+  fallow: "Fallow",
+};
+
+/** Each stage holds an ISO date; every stage is optional until it happens. */
+export type PlotCycle = Partial<Record<PlotStage, string>>;
+
 export interface Plot {
   id: string;
   farmId: string;
   name: string;
   sizeAcres: number;
   cropId: string;
+  variety?: string; // e.g. "Kulai", "Centel F1"
   workerId: string; // worker managing this plot
-  plantedDate: string; // ISO date
+  cycle: PlotCycle;
+  /** @deprecated superseded by `cycle.planting`; kept so saves made before
+   *  the cycle fields existed still load. Migrated on read in lib/store. */
+  plantedDate?: string;
   status: "Active" | "Fallow" | "Preparing";
 }
 

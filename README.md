@@ -29,7 +29,7 @@ Then open http://localhost:3000
 | Page | Problem it addresses |
 |---|---|
 | **Overview** | One "action needed" list: missed rent, missed loan installments, expiring contracts, overdue collector payments, low stock, unclaimed receipts, delayed contractors |
-| **Farms & Plots** | Multiple farms of different sizes, each with plots, crops, partners and the worker managing each plot |
+| **Farms & Plots** | Multiple farms of different sizes, each with plots, crops, **varieties**, partners and the worker managing each plot. Add, edit and delete farms and plots; set plot status inline; record the full crop cycle (sowing → planting → transplanting → flowering → harvesting → fallow) and see the total cycle length per plot and the average per crop |
 | **Rental Contracts** | Landlord, monthly rent, contract period, deposit. Month-by-month payment tracker with missed months flagged red, plus expiry/renewal warnings |
 | **Loans** | Bank, relative and friend loans with interest rate, installment, tenure, running balance and missed-installment tracking |
 | **Setup Projects** | Third-party contractor jobs (land clearing, fencing, tilling) with quoted charges, amount paid, deadlines and days-late tracking |
@@ -47,12 +47,14 @@ Then open http://localhost:3000
 - **Payment due date** — sale date + the collector's payment term in days; anything past that is flagged overdue.
 - **Average selling price** — total revenue ÷ total kg, broken down by crop, by grade and by collector for the year.
 - **Application cost** — sum of `quantity used × unit cost` for every product in the tank mix. Entering a dose rate per 100 L auto-calculates the quantity from the water volume.
+- **Crop cycle length** — days from the first recorded stage to the last. A cycle counts as complete once it has a fallow date; the per-crop average is taken over completed cycles only.
 
 ## Notes
 
 - Receipt images are downscaled to 900px wide and stored as JPEG data URLs to stay within `localStorage` limits.
 - Adding a purchase line with an invoice name not yet mapped will save that name as an alias for the linked item, so the match is automatic next time.
 - Recording a spray application deducts the mixed quantities from stock.
+- Deleting a farm or plot shows exactly which linked records (harvests, tasks, applications, contracts, sales) will be removed with it, because those deletions cascade and cannot be undone.
 
 ## Project structure
 
