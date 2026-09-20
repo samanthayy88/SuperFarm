@@ -23,6 +23,11 @@ function migrate(db: DB): DB {
       if (!cycle.planting && p.plantedDate) cycle.planting = p.plantedDate;
       return { ...p, cycle };
     }),
+    // scheduled tasks used to carry a `notes` field; it is now `remarks`
+    tasks: (db.tasks ?? []).map((t) => {
+      const legacy = (t as { notes?: string }).notes;
+      return t.remarks || !legacy ? t : { ...t, remarks: legacy };
+    }),
   };
 }
 

@@ -144,7 +144,8 @@ export interface ScheduleTask {
   workerId: string;
   task: string;
   status: "Planned" | "In Progress" | "Done";
-  notes?: string;
+  /** Free-text detail for the worker — instructions, dosage, cautions. */
+  remarks?: string;
 }
 
 // ---------- Collectors & sales ----------

@@ -17,6 +17,7 @@ import {
   EmptyState,
   Tabs,
   ConfirmDialog,
+  Textarea,
   inputClass,
 } from "@/components/ui";
 import { fmtDate, TODAY } from "@/lib/utils";
@@ -30,6 +31,86 @@ function isoAddDays(base: Date, days: number) {
 
 const statusTone = (s: ScheduleTask["status"]) =>
   s === "Done" ? "good" : s === "In Progress" ? "accent" : "neutral";
+
+/**
+ * Toggle chips for choosing any number of plots on a farm.
+ * An empty selection means "the whole farm".
+ */
+function PlotPicker({
+  farmId,
+  selected,
+  onChange,
+  hint,
+}: {
+  farmId: string;
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  hint?: string;
+}) {
+  const { db } = useStore();
+  const plots = db.plots.filter((p) => p.farmId === farmId);
+
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  return (
+    <div>
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-ink-2">Plots</span>
+        {plots.length > 0 && (
+          <span className="flex gap-2 text-xs">
+            <button
+              onClick={() => onChange(plots.map((p) => p.id))}
+              className="font-medium text-accent hover:underline"
+            >
+              Select all
+            </button>
+            <button
+              onClick={() => onChange([])}
+              className="font-medium text-muted hover:text-ink-2 hover:underline"
+            >
+              Clear
+            </button>
+          </span>
+        )}
+      </div>
+      {plots.length === 0 ? (
+        <p className="text-xs text-muted">This farm has no plots — the task will cover the whole farm.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {plots.map((p) => {
+              const on = selected.includes(p.id);
+              const crop = db.crops.find((c) => c.id === p.cropId)?.name;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => toggle(p.id)}
+                  aria-pressed={on}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    on
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-hairline bg-surface text-ink-2 hover:bg-surface-2"
+                  }`}
+                >
+                  {on ? "✓ " : ""}
+                  {p.name}
+                  {crop && <span className="ml-1 opacity-70">· {crop}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            {hint ??
+              (selected.length === 0
+                ? "None selected — the task covers the whole farm."
+                : `${selected.length} plot${selected.length === 1 ? "" : "s"} selected — each gets its own task.`)}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function SchedulePage() {
   const { db, update } = useStore();
@@ -179,6 +260,11 @@ export default function SchedulePage() {
                           </button>
                         </div>
                         <p className="text-sm text-ink-2">{t.task}</p>
+                        {t.remarks && (
+                          <p className="mt-1 whitespace-pre-line border-l-2 border-hairline pl-2 text-xs text-muted">
+                            {t.remarks}
+                          </p>
+                        )}
                         <p className="mt-1 text-xs text-muted">{farm}{plot ? ` · ${plot}` : ""}</p>
                         <div className="mt-2 flex gap-1 border-t border-hairline pt-2">
                           <button
@@ -228,7 +314,12 @@ export default function SchedulePage() {
                             {db.farms.find((f) => f.id === t.farmId)?.name}
                             {t.plotId ? ` · ${db.plots.find((p) => p.id === t.plotId)?.name}` : ""}
                           </Td>
-                          <Td>{t.task}</Td>
+                          <Td>
+                            {t.task}
+                            {t.remarks && (
+                              <p className="mt-0.5 max-w-xs whitespace-pre-line text-xs text-muted">{t.remarks}</p>
+                            )}
+                          </Td>
                           <Td>
                             <button onClick={() => cycleStatus(t.id)} title="Click to change status">
                               <Badge tone={statusTone(t.status)}>{t.status}</Badge>
@@ -264,7 +355,12 @@ export default function SchedulePage() {
                   <Td>{db.workers.find((w) => w.id === t.workerId)?.name ?? "—"}</Td>
                   <Td>{db.farms.find((f) => f.id === t.farmId)?.name ?? "—"}</Td>
                   <Td>{db.plots.find((p) => p.id === t.plotId)?.name ?? "—"}</Td>
-                  <Td>{t.task}</Td>
+                  <Td>
+                    {t.task}
+                    {t.remarks && (
+                      <p className="mt-0.5 max-w-xs whitespace-pre-line text-xs text-muted">{t.remarks}</p>
+                    )}
+                  </Td>
                   <Td>
                     <button onClick={() => cycleStatus(t.id)} title="Click to change status">
                       <Badge tone={statusTone(t.status)}>{t.status}</Badge>
@@ -311,6 +407,7 @@ function TaskForm({ onClose }: { onClose: () => void }) {
     farmId: db.farms[0]?.id ?? "",
     workerId: db.workers[0]?.id ?? "",
     repeatDays: "1",
+    remarks: "",
   });
   // empty = the whole farm; otherwise one task per selected plot
   const [plotIds, setPlotIds] = useState<string[]>([]);
@@ -327,14 +424,10 @@ function TaskForm({ onClose }: { onClose: () => void }) {
     pendingFocus.current = null;
   }, [rows]);
 
-  const plots = db.plots.filter((p) => p.farmId === form.farmId);
   const filled = rows.filter((r) => r.text.trim());
   const repeat = Math.max(1, Number(form.repeatDays) || 1);
   const targets = plotIds.length > 0 ? plotIds.length : 1;
   const totalTasks = filled.length * targets * repeat;
-
-  const togglePlot = (id: string) =>
-    setPlotIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   /** Typing in the last row grows the list, so there is always a free row. */
   const setText = (key: string, text: string) => {
@@ -381,6 +474,7 @@ function TaskForm({ onClose }: { onClose: () => void }) {
             workerId: form.workerId,
             task: row.text.trim(),
             status: "Planned",
+            remarks: form.remarks.trim() || undefined,
           });
         }
       }
@@ -421,60 +515,7 @@ function TaskForm({ onClose }: { onClose: () => void }) {
           </Select>
         </Field>
 
-        <div>
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium text-ink-2">Plots</span>
-            {plots.length > 0 && (
-              <span className="flex gap-2 text-xs">
-                <button
-                  onClick={() => setPlotIds(plots.map((p) => p.id))}
-                  className="font-medium text-accent hover:underline"
-                >
-                  Select all
-                </button>
-                <button
-                  onClick={() => setPlotIds([])}
-                  className="font-medium text-muted hover:text-ink-2 hover:underline"
-                >
-                  Clear
-                </button>
-              </span>
-            )}
-          </div>
-          {plots.length === 0 ? (
-            <p className="text-xs text-muted">This farm has no plots — the task will cover the whole farm.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-1.5">
-                {plots.map((p) => {
-                  const on = plotIds.includes(p.id);
-                  const crop = db.crops.find((c) => c.id === p.cropId)?.name;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => togglePlot(p.id)}
-                      aria-pressed={on}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        on
-                          ? "border-accent bg-accent-soft text-accent"
-                          : "border-hairline bg-surface text-ink-2 hover:bg-surface-2"
-                      }`}
-                    >
-                      {on ? "✓ " : ""}
-                      {p.name}
-                      {crop && <span className="ml-1 opacity-70">· {crop}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                {plotIds.length === 0
-                  ? "None selected — the task covers the whole farm."
-                  : `${plotIds.length} plot${plotIds.length === 1 ? "" : "s"} selected — each gets its own task.`}
-              </p>
-            </>
-          )}
-        </div>
+        <PlotPicker farmId={form.farmId} selected={plotIds} onChange={setPlotIds} />
 
         <div>
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Tasks</span>
@@ -513,6 +554,18 @@ function TaskForm({ onClose }: { onClose: () => void }) {
           </p>
         </div>
 
+        <Field label="Remarks (optional)">
+          <Textarea
+            rows={3}
+            value={form.remarks}
+            onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+            placeholder="Instructions, dosage, cautions — anything the worker needs to know"
+          />
+          <span className="mt-1 block text-xs text-muted">
+            Applies to every task above. You can change it per task afterwards.
+          </span>
+        </Field>
+
         {totalTasks > 0 && (
           <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
             Will schedule <strong className="text-ink">{totalTasks}</strong>{" "}
@@ -545,31 +598,38 @@ function EditTaskForm({ task, onClose }: { task: ScheduleTask; onClose: () => vo
   const [form, setForm] = useState({
     date: task.date,
     farmId: task.farmId,
-    plotId: task.plotId ?? "",
     workerId: task.workerId,
     task: task.task,
     status: task.status,
+    remarks: task.remarks ?? "",
   });
+  // empty = whole farm; more than one = this task is split, one per plot
+  const [plotIds, setPlotIds] = useState<string[]>(task.plotId ? [task.plotId] : []);
 
-  const plots = db.plots.filter((p) => p.farmId === form.farmId);
+  const extra = Math.max(0, plotIds.length - 1);
 
   const submit = () => {
     if (!form.task.trim()) return;
-    update("tasks", (list) =>
-      list.map((t) =>
-        t.id === task.id
-          ? {
-              ...t,
-              date: form.date,
-              farmId: form.farmId,
-              plotId: form.plotId || undefined,
-              workerId: form.workerId,
-              task: form.task.trim(),
-              status: form.status,
-            }
-          : t
-      )
-    );
+    const base = {
+      date: form.date,
+      farmId: form.farmId,
+      workerId: form.workerId,
+      task: form.task.trim(),
+      status: form.status,
+      remarks: form.remarks.trim() || undefined,
+    };
+    const [first, ...rest] = plotIds.length > 0 ? plotIds : [undefined];
+
+    update("tasks", (list) => {
+      const updated = list.map((t) => (t.id === task.id ? { ...t, ...base, plotId: first } : t));
+      // any additional plots become their own tasks alongside this one
+      const added: ScheduleTask[] = rest.map((plotId) => ({
+        id: newId("t"),
+        ...base,
+        plotId,
+      }));
+      return [...updated, ...added];
+    });
     onClose();
   };
 
@@ -579,6 +639,16 @@ function EditTaskForm({ task, onClose }: { task: ScheduleTask; onClose: () => vo
         <Field label="Task">
           <TextInput value={form.task} onChange={(e) => setForm({ ...form, task: e.target.value })} />
         </Field>
+
+        <Field label="Remarks (optional)">
+          <Textarea
+            rows={4}
+            value={form.remarks}
+            onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+            placeholder="Instructions, dosage, cautions — anything the worker needs to know"
+          />
+        </Field>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Date">
             <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
@@ -594,6 +664,7 @@ function EditTaskForm({ task, onClose }: { task: ScheduleTask; onClose: () => vo
             </Select>
           </Field>
         </div>
+
         <Field label="Worker">
           <Select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
             {db.workers.map((w) => (
@@ -601,29 +672,41 @@ function EditTaskForm({ task, onClose }: { task: ScheduleTask; onClose: () => vo
             ))}
           </Select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Farm">
-            <Select
-              value={form.farmId}
-              onChange={(e) => setForm({ ...form, farmId: e.target.value, plotId: "" })}
-            >
-              {db.farms.map((f) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Plot (optional)">
-            <Select value={form.plotId} onChange={(e) => setForm({ ...form, plotId: e.target.value })}>
-              <option value="">Whole farm</option>
-              {plots.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </Select>
-          </Field>
-        </div>
+
+        <Field label="Farm">
+          <Select
+            value={form.farmId}
+            onChange={(e) => {
+              setForm({ ...form, farmId: e.target.value });
+              setPlotIds([]);
+            }}
+          >
+            {db.farms.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </Select>
+        </Field>
+
+        <PlotPicker
+          farmId={form.farmId}
+          selected={plotIds}
+          onChange={setPlotIds}
+          hint={
+            plotIds.length === 0
+              ? "None selected — this task covers the whole farm."
+              : plotIds.length === 1
+                ? "1 plot selected."
+                : `${plotIds.length} plots selected — this task stays on the first and ${extra} more ${
+                    extra === 1 ? "task is" : "tasks are"
+                  } created for the rest, so each plot can be ticked off on its own.`
+          }
+        />
+
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit}>Save changes</Button>
+          <Button onClick={submit}>
+            {extra > 0 ? `Save & create ${extra} more` : "Save changes"}
+          </Button>
         </div>
       </div>
     </Modal>

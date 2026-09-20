@@ -306,3 +306,7 @@ export function ConfirmDialog({
     </Modal>
   );
 }
+
+export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`${inputClass} resize-y leading-relaxed`} />;
+}
