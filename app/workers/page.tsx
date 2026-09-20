@@ -232,7 +232,7 @@ function ExpenseForm({ workerId, onClose }: { workerId: string; onClose: () => v
             type="checkbox"
             checked={form.deductFromSalary}
             onChange={(e) => setForm({ ...form, deductFromSalary: e.target.checked })}
-            className="accent-[#3987e5]"
+            className="accent-[var(--accent)]"
           />
           Deduct from monthly salary
         </label>

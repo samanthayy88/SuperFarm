@@ -1,32 +1,174 @@
 @import "tailwindcss";
 
-@theme {
-  --color-page: #0d0d0d;
-  --color-surface: #1a1a19;
-  --color-surface-2: #232322;
-  --color-ink: #ffffff;
-  --color-ink-2: #c3c2b7;
-  --color-muted: #898781;
-  --color-grid: #2c2c2a;
-  --color-hairline: rgba(255, 255, 255, 0.1);
-  --color-accent: #3987e5;
-  --color-series-2: #d95926;
-  --color-series-3: #199e70;
-  --color-series-4: #c98500;
-  --color-good: #0ca30c;
-  --color-warning: #fab219;
-  --color-serious: #ec835a;
-  --color-critical: #d03b3b;
+/* ---------------------------------------------------------------------------
+   Design tokens — light and dark.
+
+   Every token is declared as a plain CSS variable below, then exposed to
+   Tailwind through `@theme inline` so the generated utilities compile to
+   `var(--…)` rather than a baked-in hex. That is what lets a single
+   `data-theme` attribute on <html> restyle the whole app.
+
+   Colours are adapted from ClickUp's public design tokens; the status and
+   muted steps were darkened/lightened from theirs so every text-on-background
+   pairing clears WCAG AA (4.5:1) at small sizes.
+--------------------------------------------------------------------------- */
+
+:root,
+:root[data-theme="light"] {
+  --page: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f2f4;
+  --surface-3: #e9eaed;
+
+  --ink: #202020;
+  --ink-2: #646464;
+  --muted: #6e6e6e;
+
+  --hairline: #e8e8e8;
+  --grid: #f0f1f3;
+
+  --accent: #6647f0;
+  --accent-hover: #563bd6;
+  --accent-soft: #efedfd;
+  --on-accent: #ffffff;
+
+  /* near-black primary button, the way ClickUp does it */
+  --solid: #202020;
+  --solid-hover: #000000;
+  --on-solid: #ffffff;
+
+  --good: #05752f;
+  --good-soft: #e2f8ec;
+  --warning: #8f5400;
+  --warning-soft: #fdf2d5;
+  --serious: #c2410c;
+  --serious-soft: #fdede7;
+  --critical: #b8251c;
+  --critical-soft: #fbdddd;
+
+  --chart-1: #6647f0;
+  --chart-1-hover: #8163f5;
+  --chart-axis: #d6d7db;
+  --chart-grid: #eceef1;
+
+  /* raised chip inside a segmented control */
+  --chip-active: #ffffff;
+
+  --shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 0 0 1px rgba(16, 16, 20, 0.03);
+  --shadow-pop: 0 12px 32px rgba(16, 16, 20, 0.14), 0 2px 8px rgba(16, 16, 20, 0.08);
+  --scrollbar: #d3d4d8;
+}
+
+:root[data-theme="dark"] {
+  --page: #141417;
+  --surface: #1c1c21;
+  --surface-2: #26262c;
+  --surface-3: #303039;
+
+  --ink: #f5f5f7;
+  --ink-2: #b4b4bd;
+  --muted: #8a8a94;
+
+  --hairline: rgba(255, 255, 255, 0.09);
+  --grid: rgba(255, 255, 255, 0.06);
+
+  --accent: #8b7cf6;
+  --accent-hover: #9d90f8;
+  --accent-soft: rgba(163, 150, 255, 0.16);
+  --on-accent: #16131f;
+
+  /* inverted in dark: a light chip reads as "primary" against the dark page */
+  --solid: #f5f5f7;
+  --solid-hover: #ffffff;
+  --on-solid: #1c1c21;
+
+  --good: #3ecf7f;
+  --good-soft: rgba(62, 207, 127, 0.16);
+  --warning: #f5bd4f;
+  --warning-soft: rgba(245, 189, 79, 0.16);
+  --serious: #ff8a5b;
+  --serious-soft: rgba(255, 138, 91, 0.16);
+  --critical: #ff6b6b;
+  --critical-soft: rgba(255, 107, 107, 0.16);
+
+  --chart-1: #8b7cf6;
+  --chart-1-hover: #a396ff;
+  --chart-axis: #3a3a44;
+  --chart-grid: #2a2a31;
+
+  /* lighter than the track in dark, so the chip still reads as raised */
+  --chip-active: #3a3a44;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --scrollbar: #3a3a44;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-chip-active: var(--chip-active);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+
+  --color-hairline: var(--hairline);
+  --color-grid: var(--grid);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --color-solid: var(--solid);
+  --color-solid-hover: var(--solid-hover);
+  --color-on-solid: var(--on-solid);
+
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-serious: var(--serious);
+  --color-serious-soft: var(--serious-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --radius-card: 0.75rem;
 }
 
 html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
   color-scheme: dark;
 }
 
 body {
-  background: var(--color-page);
-  color: var(--color-ink);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Theme swap should feel like a swap, not an animation of every element. */
+body,
+body * {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 130ms;
+  transition-timing-function: ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  body,
+  body * {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }
 
 .tnum {
@@ -38,11 +180,16 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #383835;
+  background: var(--scrollbar);
   border-radius: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media print {

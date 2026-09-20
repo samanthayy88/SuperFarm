@@ -306,7 +306,7 @@ function AliasAdder({ itemId }: { itemId: string }) {
           setAlias("");
           setOpen(false);
         }}
-        className="rounded bg-accent px-2 py-1 text-xs text-white"
+        className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-on-accent"
       >
         Save
       </button>

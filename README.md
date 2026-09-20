@@ -4,6 +4,8 @@ A multi-farm operations dashboard for managing farms, plots, workers, contracts,
 
 Built with Next.js (App Router) and Tailwind CSS. Data is stored in the browser's `localStorage`, so everything works offline with no backend. A sample dataset loads on first run; use **Reset sample data** at the bottom of the sidebar to restore it.
 
+**Light & dark mode.** Use the Light/Dark switch at the bottom of the sidebar (top-right bar on mobile). Your choice is remembered per browser; on first visit the app follows your operating-system preference. The theme is applied before the page paints, so there is no flash of the wrong colours on reload.
+
 > ### ⚠️ Where real data belongs
 >
 > All names, ID numbers, phone numbers and figures in `lib/seed.ts` are **invented demo data**.
@@ -69,9 +71,11 @@ app/
   applications/       Spray application costing
 components/
   ui.tsx              Shared UI kit (cards, tables, modals, badges, forms)
-  Sidebar.tsx         Navigation
+  Sidebar.tsx         Navigation + theme switch
+  ThemeToggle.tsx     Light/dark segmented control
   BarChart.tsx        Bar chart with hover tooltip
 lib/
+  theme.tsx           Theme state + the before-paint init script
   types.ts            Data model for every entity
   seed.ts             Sample dataset
   store.tsx           localStorage-backed store

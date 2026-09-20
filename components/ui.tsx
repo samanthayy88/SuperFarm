@@ -14,10 +14,10 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -34,10 +34,12 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-lg border border-hairline bg-surface ${className}`}>
+    <section
+      className={`rounded-card border border-hairline bg-surface shadow-card ${className}`}
+    >
       {(title || actions) && (
-        <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
-          {title && <h2 className="text-sm font-medium text-ink-2">{title}</h2>}
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
+          {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
           {actions}
         </header>
       )}
@@ -66,8 +68,8 @@ export function StatCard({
           ? "text-critical"
           : "text-ink";
   return (
-    <div className="rounded-lg border border-hairline bg-surface p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
+    <div className="rounded-card border border-hairline bg-surface p-4 shadow-card">
+      <p className="text-xs font-medium tracking-wide text-muted">{label}</p>
       <p className={`mt-2 text-2xl font-semibold tnum ${toneClass}`}>{value}</p>
       {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </div>
@@ -76,19 +78,20 @@ export function StatCard({
 
 type BadgeTone = "neutral" | "good" | "warning" | "serious" | "critical" | "accent";
 
+/* ClickUp-style pill: saturated label on a soft tint of the same hue. */
 const badgeStyles: Record<BadgeTone, string> = {
   neutral: "bg-surface-2 text-ink-2",
-  good: "bg-good/15 text-good",
-  warning: "bg-warning/15 text-warning",
-  serious: "bg-serious/15 text-serious",
-  critical: "bg-critical/15 text-critical",
-  accent: "bg-accent/15 text-accent",
+  good: "bg-good-soft text-good",
+  warning: "bg-warning-soft text-warning",
+  serious: "bg-serious-soft text-serious",
+  critical: "bg-critical-soft text-critical",
+  accent: "bg-accent-soft text-accent",
 };
 
 export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; children: React.ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap ${badgeStyles[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${badgeStyles[tone]}`}
     >
       {children}
     </span>
@@ -106,7 +109,7 @@ export function Table({ children }: { children: React.ReactNode }) {
 export function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
   return (
     <th
-      className={`border-b border-hairline px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted ${right ? "text-right" : ""}`}
+      className={`border-b border-hairline px-3 py-2.5 text-xs font-semibold tracking-wide text-muted ${right ? "text-right" : ""}`}
     >
       {children}
     </th>
@@ -123,7 +126,9 @@ export function Td({
   className?: string;
 }) {
   return (
-    <td className={`border-b border-grid px-3 py-2 align-top ${right ? "text-right tnum" : ""} ${className}`}>
+    <td
+      className={`border-b border-grid px-3 py-2.5 align-top text-ink-2 ${right ? "text-right tnum" : ""} ${className}`}
+    >
       {children}
     </td>
   );
@@ -142,15 +147,19 @@ export function Button({
   type?: "button" | "submit";
   small?: boolean;
 }) {
-  const base = small ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-sm";
+  const base = small ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
   const style =
     variant === "primary"
-      ? "bg-accent text-white hover:bg-accent/85"
+      ? "bg-solid text-on-solid hover:bg-solid-hover"
       : variant === "danger"
-        ? "bg-critical/15 text-critical hover:bg-critical/25"
-        : "border border-hairline bg-surface-2 text-ink-2 hover:bg-grid";
+        ? "bg-critical-soft text-critical hover:brightness-95"
+        : "border border-hairline bg-surface text-ink-2 hover:bg-surface-2 hover:text-ink";
   return (
-    <button type={type} onClick={onClick} className={`rounded font-medium transition-colors ${base} ${style}`}>
+    <button
+      type={type}
+      onClick={onClick}
+      className={`rounded-lg font-medium transition-colors ${base} ${style}`}
+    >
       {children}
     </button>
   );
@@ -168,14 +177,21 @@ export function Modal({
   wide?: boolean;
 }) {
   return (
-    <div className="no-print fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-12" onClick={onClose}>
+    <div
+      className="no-print fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-lg border border-hairline bg-surface shadow-xl`}
+        className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-card border border-hairline bg-surface shadow-pop`}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b border-hairline px-5 py-3">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Close">
+        <header className="flex items-center justify-between border-b border-hairline px-5 py-3.5">
+          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink"
+            aria-label="Close"
+          >
             ✕
           </button>
         </header>
@@ -188,14 +204,14 @@ export function Modal({
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-ink-2">{label}</span>
       {children}
     </label>
   );
 }
 
 export const inputClass =
-  "w-full rounded border border-hairline bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none";
+  "w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputClass} />;
@@ -209,6 +225,7 @@ export function EmptyState({ message }: { message: string }) {
   return <p className="py-8 text-center text-sm text-muted">{message}</p>;
 }
 
+/** ClickUp-style view switcher: soft pills rather than an underlined tab rail. */
 export function Tabs({
   tabs,
   active,
@@ -219,13 +236,15 @@ export function Tabs({
   onChange: (t: string) => void;
 }) {
   return (
-    <div className="mb-4 flex gap-1 border-b border-hairline">
+    <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-surface-2 p-1">
       {tabs.map((t) => (
         <button
           key={t}
           onClick={() => onChange(t)}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-            active === t ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink-2"
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            active === t
+              ? "bg-chip-active text-ink shadow-card"
+              : "text-muted hover:text-ink"
           }`}
         >
           {t}

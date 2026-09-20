@@ -8,13 +8,17 @@ export interface BarDatum {
   detail?: string;
 }
 
-/** Single-series vertical bar chart (sequential blue), with per-bar hover tooltip. */
 /** Axis ticks stay short so they never crowd the plot: 12,400 → 12.4k */
 function compact(v: number) {
   if (v >= 1000) return `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k`;
   return v.toFixed(0);
 }
 
+/**
+ * Single-series vertical bar chart with a per-bar hover tooltip.
+ * Colours reference the theme CSS variables directly, so the chart follows
+ * light/dark without re-rendering.
+ */
 export default function BarChart({
   data,
   height = 200,
@@ -40,8 +44,8 @@ export default function BarChart({
           const y = padTop + plotH * (1 - t);
           return (
             <g key={t}>
-              <line x1={36} x2={596} y1={y} y2={y} stroke="#2c2c2a" strokeWidth={1} />
-              <text x={32} y={y + 3} textAnchor="end" fontSize={9} fill="#898781">
+              <line x1={36} x2={596} y1={y} y2={y} stroke="var(--chart-grid)" strokeWidth={1} />
+              <text x={32} y={y + 3} textAnchor="end" fontSize={9} fill="var(--muted)">
                 {t === 0 ? "0" : compact(max * t)}
               </text>
             </g>
@@ -54,6 +58,7 @@ export default function BarChart({
           const x = 40 + slot * i + (slot - barW) / 2;
           const h = (d.value / max) * plotH;
           const y = padTop + plotH - h;
+          const fill = hover === i ? "var(--chart-1-hover)" : "var(--chart-1)";
           return (
             <g key={d.label}>
               {/* invisible hit target wider than the bar */}
@@ -72,32 +77,46 @@ export default function BarChart({
                 width={barW}
                 height={Math.max(h, d.value > 0 ? 2 : 0)}
                 rx={4}
-                fill={hover === i ? "#5598e7" : "#3987e5"}
+                fill={fill}
                 style={{ pointerEvents: "none" }}
               />
               {/* baseline-anchored: square off bottom corners */}
               {h > 4 && (
-                <rect x={x} y={padTop + plotH - 4} width={barW} height={4} fill={hover === i ? "#5598e7" : "#3987e5"} style={{ pointerEvents: "none" }} />
+                <rect
+                  x={x}
+                  y={padTop + plotH - 4}
+                  width={barW}
+                  height={4}
+                  fill={fill}
+                  style={{ pointerEvents: "none" }}
+                />
               )}
               <text
                 x={x + barW / 2}
                 y={height - 8}
                 textAnchor="middle"
                 fontSize={10}
-                fill={hover === i ? "#c3c2b7" : "#898781"}
+                fill={hover === i ? "var(--ink-2)" : "var(--muted)"}
               >
                 {d.label}
               </text>
             </g>
           );
         })}
-        <line x1={36} x2={596} y1={padTop + plotH} y2={padTop + plotH} stroke="#383835" strokeWidth={1} />
+        <line
+          x1={36}
+          x2={596}
+          y1={padTop + plotH}
+          y2={padTop + plotH}
+          stroke="var(--chart-axis)"
+          strokeWidth={1}
+        />
       </svg>
       {hover !== null && (
-        <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 rounded border border-hairline bg-surface-2 px-3 py-1.5 text-xs shadow-lg">
-          <span className="font-medium">{data[hover].label}</span>
+        <div className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs shadow-pop">
+          <span className="font-medium text-ink">{data[hover].label}</span>
           <span className="mx-1.5 text-muted">·</span>
-          <span className="tnum">{formatValue(data[hover].value)}</span>
+          <span className="tnum text-ink-2">{formatValue(data[hover].value)}</span>
           {data[hover].detail && <span className="ml-1.5 text-muted">{data[hover].detail}</span>}
         </div>
       )}
