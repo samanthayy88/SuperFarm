@@ -27,7 +27,7 @@ import {
   nextStage,
   averageCycleDaysByCrop,
 } from "@/lib/utils";
-import { Farm, Plot, PlotCycle, PLOT_STAGES, PLOT_STAGE_LABELS } from "@/lib/types";
+import { Farm, Plot, PlotCycle, PlotCycleRecord, PLOT_STAGES, PLOT_STAGE_LABELS } from "@/lib/types";
 
 export default function FarmsPage() {
   const { db, update, setDB } = useStore();
@@ -39,6 +39,7 @@ export default function FarmsPage() {
   const [deleteFarm, setDeleteFarm] = useState<Farm | null>(null);
   const [deletePlot, setDeletePlot] = useState<Plot | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [historyFarm, setHistoryFarm] = useState<Farm | null>(null);
 
   /* ---------- deletion, with every linked record accounted for ---------- */
 
@@ -155,6 +156,9 @@ export default function FarmsPage() {
                   <Button small variant="ghost" onClick={() => setPlotForm({ mode: "add", farmId: farm.id })}>
                     + Add Plot
                   </Button>
+                  <Button small variant="ghost" onClick={() => setHistoryFarm(farm)}>
+                    History
+                  </Button>
                   <Button small variant="ghost" onClick={() => setFarmForm({ mode: "edit", farm })}>
                     Edit farm
                   </Button>
@@ -198,11 +202,11 @@ export default function FarmsPage() {
                     {plots.map((p) => {
                       const crop = db.crops.find((c) => c.id === p.cropId)?.name ?? "—";
                       const worker = db.workers.find((w) => w.id === p.workerId)?.name ?? "—";
-                      const steps = cycleSteps(p);
-                      const stage = currentStage(p);
-                      const upcoming = nextStage(p);
-                      const total = cycleDurationDays(p);
-                      const soFar = cycleDaysSoFar(p);
+                      const steps = cycleSteps(p.cycle);
+                      const stage = currentStage(p.cycle);
+                      const upcoming = nextStage(p.cycle);
+                      const total = cycleDurationDays(p.cycle);
+                      const soFar = cycleDaysSoFar(p.cycle);
                       const done = Boolean(p.cycle?.fallow);
                       const isOpen = expanded === p.id;
                       return (
@@ -320,6 +324,7 @@ export default function FarmsPage() {
           onClose={() => setPlotForm(null)}
         />
       )}
+      {historyFarm && <FarmHistoryModal farm={historyFarm} onClose={() => setHistoryFarm(null)} />}
       {deleteFarm && (
         <ConfirmDialog
           title={`Delete ${deleteFarm.name}?`}
@@ -413,6 +418,70 @@ function CycleDetail({
         </p>
       )}
     </div>
+  );
+}
+
+/* ------------------------------ farm history ------------------------------ */
+
+function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }) {
+  const { db } = useStore();
+  const plots = db.plots.filter((p) => p.farmId === farm.id);
+
+  type Row = { plot: Plot; record: PlotCycleRecord };
+  const rows: Row[] = plots
+    .flatMap((plot) => (plot.history ?? []).map((record) => ({ plot, record })))
+    .sort((a, b) => (a.record.archivedAt < b.record.archivedAt ? 1 : -1));
+
+  return (
+    <Modal title={`Planting History — ${farm.name}`} onClose={onClose} wide>
+      {rows.length === 0 ? (
+        <EmptyState message="No completed cycles yet. Past plantings appear here once a plot starts a new cycle." />
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <Th>Plot</Th>
+              <Th>Crop</Th>
+              <Th>Variety</Th>
+              <Th>Managed by</Th>
+              <Th>Cycle</Th>
+              <Th right>Duration</Th>
+              <Th right>Archived</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ plot, record }) => {
+              const crop = db.crops.find((c) => c.id === record.cropId)?.name ?? "—";
+              const worker = db.workers.find((w) => w.id === record.workerId)?.name ?? "—";
+              const steps = cycleSteps(record.cycle);
+              const duration = cycleDurationDays(record.cycle);
+              return (
+                <tr key={record.id}>
+                  <Td className="font-medium text-ink">{plot.name}</Td>
+                  <Td>{crop}</Td>
+                  <Td>{record.variety || <span className="text-muted">—</span>}</Td>
+                  <Td>{worker}</Td>
+                  <Td>
+                    {steps.length > 0 ? (
+                      <span className="text-xs text-ink-2">
+                        {steps[0].label} {fmtDate(steps[0].date)} → {steps[steps.length - 1].label}{" "}
+                        {fmtDate(steps[steps.length - 1].date)}
+                      </span>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </Td>
+                  <Td right>{duration !== null ? `${duration} d` : <span className="text-muted">—</span>}</Td>
+                  <Td right className="text-xs text-muted">
+                    {fmtDate(record.archivedAt)}
+                  </Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      )}
+    </Modal>
   );
 }
 
@@ -512,6 +581,8 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
     status: plot?.status ?? ("Preparing" as Plot["status"]),
   });
   const [cycle, setCycle] = useState<PlotCycle>(plot?.cycle ?? {});
+  const [history, setHistory] = useState<PlotCycleRecord[]>(plot?.history ?? []);
+  const [confirmNewCycle, setConfirmNewCycle] = useState(false);
 
   const setStageDate = (stage: (typeof PLOT_STAGES)[number], value: string) =>
     setCycle((c) => {
@@ -520,6 +591,25 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
       else delete next[stage];
       return next;
     });
+
+  const startNewCycle = () => {
+    if (Object.keys(cycle).length > 0) {
+      setHistory((h) => [
+        {
+          id: newId("cyc"),
+          cropId: form.cropId,
+          variety: form.variety.trim() || undefined,
+          workerId: form.workerId,
+          cycle,
+          archivedAt: new Date().toISOString().slice(0, 10),
+        },
+        ...h,
+      ]);
+    }
+    setCycle({});
+    setForm((f) => ({ ...f, status: "Preparing" }));
+    setConfirmNewCycle(false);
+  };
 
   // warn when dates run backwards through the cycle
   const outOfOrder = PLOT_STAGES.filter((s, i) => {
@@ -539,6 +629,7 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
       workerId: form.workerId,
       status: form.status,
       cycle,
+      history,
     };
     if (plot) {
       update("plots", (list) => list.map((p) => (p.id === plot.id ? { ...p, ...payload } : p)));
@@ -551,6 +642,7 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
   const farmName = db.farms.find((f) => f.id === form.farmId)?.name;
 
   return (
+    <>
     <Modal title={editing ? `Edit ${plot!.name} — ${farmName}` : `Add Plot — ${farmName}`} onClose={onClose} wide>
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -619,10 +711,18 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
         </div>
 
         <div className="rounded-lg border border-hairline bg-surface-2 p-3">
-          <p className="mb-1 text-xs font-semibold tracking-wide text-ink-2">CROP CYCLE DATES</p>
+          <div className="mb-1 flex items-start justify-between gap-3">
+            <p className="text-xs font-semibold tracking-wide text-ink-2">CROP CYCLE DATES</p>
+            {editing && (
+              <Button small variant="ghost" onClick={() => setConfirmNewCycle(true)}>
+                Start New Cycle
+              </Button>
+            )}
+          </div>
           <p className="mb-3 text-xs text-muted">
             Fill in each milestone as it happens. Leave a stage blank if it does not apply — the total cycle
             is measured from the first date you record to the last.
+            {history.length > 0 && ` ${history.length} past ${history.length === 1 ? "cycle" : "cycles"} saved to History.`}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {PLOT_STAGES.map((stage) => (
@@ -646,6 +746,16 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
         </div>
       </div>
     </Modal>
+    {confirmNewCycle && (
+      <ConfirmDialog
+        title="Start a new cycle?"
+        message={`The current crop cycle dates will be saved to ${farmName}'s History, and the dates here will be cleared so you can record the new planting. This only takes effect once you save the plot.`}
+        confirmLabel="Start New Cycle"
+        onConfirm={startNewCycle}
+        onClose={() => setConfirmNewCycle(false)}
+      />
+    )}
+    </>
   );
 }
 

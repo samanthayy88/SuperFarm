@@ -5,6 +5,7 @@ import {
   SaleRecord,
   ApplicationRecord,
   Plot,
+  PlotCycle,
   PlotStage,
   PLOT_STAGES,
   PLOT_STAGE_LABELS,
@@ -177,12 +178,12 @@ export interface CycleStep {
 }
 
 /** The stages that actually have a date, in field order, with gaps between them. */
-export function cycleSteps(plot: Plot): CycleStep[] {
-  const cycle = plot.cycle ?? {};
-  const filled = PLOT_STAGES.filter((s) => cycle[s]).map((s) => ({
+export function cycleSteps(cycle: PlotCycle): CycleStep[] {
+  const c = cycle ?? {};
+  const filled = PLOT_STAGES.filter((s) => c[s]).map((s) => ({
     stage: s,
     label: PLOT_STAGE_LABELS[s],
-    date: cycle[s] as string,
+    date: c[s] as string,
   }));
   return filled.map((step, i) => ({
     ...step,
@@ -194,36 +195,48 @@ export function cycleSteps(plot: Plot): CycleStep[] {
  * Total cycle length in days: first recorded stage to last recorded stage.
  * Null when fewer than two stages have dates.
  */
-export function cycleDurationDays(plot: Plot): number | null {
-  const steps = cycleSteps(plot);
+export function cycleDurationDays(cycle: PlotCycle): number | null {
+  const steps = cycleSteps(cycle);
   if (steps.length < 2) return null;
   return daysBetween(steps[0].date, steps[steps.length - 1].date);
 }
 
 /** Days from the first recorded stage until today — for a cycle still running. */
-export function cycleDaysSoFar(plot: Plot): number | null {
-  const steps = cycleSteps(plot);
+export function cycleDaysSoFar(cycle: PlotCycle): number | null {
+  const steps = cycleSteps(cycle);
   if (steps.length === 0) return null;
   return Math.max(0, daysBetween(steps[0].date, TODAY));
 }
 
 /** The latest stage whose date has already passed. */
-export function currentStage(plot: Plot): CycleStep | null {
-  const past = cycleSteps(plot).filter((s) => new Date(s.date) <= TODAY);
+export function currentStage(cycle: PlotCycle): CycleStep | null {
+  const past = cycleSteps(cycle).filter((s) => new Date(s.date) <= TODAY);
   return past.length > 0 ? past[past.length - 1] : null;
 }
 
 /** The next stage still in the future, if any. */
-export function nextStage(plot: Plot): CycleStep | null {
-  return cycleSteps(plot).find((s) => new Date(s.date) > TODAY) ?? null;
+export function nextStage(cycle: PlotCycle): CycleStep | null {
+  return cycleSteps(cycle).find((s) => new Date(s.date) > TODAY) ?? null;
 }
 
-/** Average completed-cycle length per crop, across plots that reached fallow. */
+/**
+ * Average completed-cycle length per crop, across both the plots' current
+ * cycle (if it reached fallow) and every archived cycle in their history.
+ */
 export function averageCycleDaysByCrop(plots: Plot[], cropId: string): number | null {
-  const lengths = plots
-    .filter((p) => p.cropId === cropId && p.cycle?.fallow)
-    .map((p) => cycleDurationDays(p))
-    .filter((d): d is number => d !== null);
+  const lengths: number[] = [];
+  for (const p of plots) {
+    if (p.cropId === cropId && p.cycle?.fallow) {
+      const d = cycleDurationDays(p.cycle);
+      if (d !== null) lengths.push(d);
+    }
+    for (const h of p.history ?? []) {
+      if (h.cropId === cropId && h.cycle?.fallow) {
+        const d = cycleDurationDays(h.cycle);
+        if (d !== null) lengths.push(d);
+      }
+    }
+  }
   if (lengths.length === 0) return null;
   return Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
 }

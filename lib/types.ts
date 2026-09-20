@@ -32,6 +32,17 @@ export const PLOT_STAGE_LABELS: Record<PlotStage, string> = {
 /** Each stage holds an ISO date; every stage is optional until it happens. */
 export type PlotCycle = Partial<Record<PlotStage, string>>;
 
+/** A past crop cycle, archived off a plot when a new one is started. */
+export interface PlotCycleRecord {
+  id: string;
+  cropId: string;
+  variety?: string;
+  workerId: string;
+  cycle: PlotCycle;
+  /** ISO date the cycle was archived (i.e. when the new one began). */
+  archivedAt: string;
+}
+
 export interface Plot {
   id: string;
   farmId: string;
@@ -41,6 +52,8 @@ export interface Plot {
   variety?: string; // e.g. "Kulai", "Centel F1"
   workerId: string; // worker managing this plot
   cycle: PlotCycle;
+  /** Past cycles for this plot, most recent first. See "Start New Cycle". */
+  history: PlotCycleRecord[];
   /** @deprecated superseded by `cycle.planting`; kept so saves made before
    *  the cycle fields existed still load. Migrated on read in lib/store. */
   plantedDate?: string;

@@ -49,20 +49,37 @@ export const seedDB: DB = {
   plots: [
     // Chili: sown in nursery, transplanted out, ~4 months to first harvest.
     { id: "p1", farmId: "f1", name: "Plot A", sizeAcres: 4, cropId: "c1", variety: "Kulai Red", workerId: "w1", status: "Active",
-      cycle: { sowing: "2026-02-10", planting: "2026-03-10", transplanting: "2026-03-18", flowering: "2026-05-02", harvesting: "2026-06-14" } },
+      cycle: { sowing: "2026-02-10", planting: "2026-03-10", transplanting: "2026-03-18", flowering: "2026-05-02", harvesting: "2026-06-14" },
+      history: [] },
     { id: "p2", farmId: "f1", name: "Plot B", sizeAcres: 3, cropId: "c2", variety: "Long Bean 101", workerId: "w2", status: "Active",
-      cycle: { sowing: "2026-03-20", planting: "2026-04-02", flowering: "2026-05-14", harvesting: "2026-06-05" } },
+      cycle: { sowing: "2026-03-20", planting: "2026-04-02", flowering: "2026-05-14", harvesting: "2026-06-05" },
+      history: [] },
     // A finished cycle, so the average-cycle figure has something to average.
+    // Also carries one archived cycle, to seed the "History" view with an example.
     { id: "p3", farmId: "f1", name: "Plot C", sizeAcres: 5, cropId: "c1", variety: "Bara F1", workerId: "w3", status: "Fallow",
-      cycle: { sowing: "2026-04-22", planting: "2026-05-20", transplanting: "2026-05-29", flowering: "2026-07-08", harvesting: "2026-08-16", fallow: "2026-09-12" } },
+      cycle: { sowing: "2026-04-22", planting: "2026-05-20", transplanting: "2026-05-29", flowering: "2026-07-08", harvesting: "2026-08-16", fallow: "2026-09-12" },
+      history: [
+        {
+          id: "cyc1",
+          cropId: "c2",
+          variety: "Long Bean 101",
+          workerId: "w3",
+          cycle: { sowing: "2025-12-01", planting: "2025-12-20", flowering: "2026-02-02", harvesting: "2026-03-10", fallow: "2026-04-10" },
+          archivedAt: "2026-04-22",
+        },
+      ] },
     { id: "p4", farmId: "f2", name: "Plot A", sizeAcres: 4, cropId: "c3", variety: "Green Star", workerId: "w4", status: "Active",
-      cycle: { sowing: "2026-04-01", planting: "2026-04-15", flowering: "2026-05-20", harvesting: "2026-06-08" } },
+      cycle: { sowing: "2026-04-01", planting: "2026-04-15", flowering: "2026-05-20", harvesting: "2026-06-08" },
+      history: [] },
     { id: "p5", farmId: "f2", name: "Plot B", sizeAcres: 4, cropId: "c4", variety: "Clemson Spineless", workerId: "w5", status: "Active",
-      cycle: { sowing: "2026-04-18", planting: "2026-05-01", flowering: "2026-06-12", harvesting: "2026-07-03" } },
+      cycle: { sowing: "2026-04-18", planting: "2026-05-01", flowering: "2026-06-12", harvesting: "2026-07-03" },
+      history: [] },
     { id: "p6", farmId: "f3", name: "Plot A", sizeAcres: 3, cropId: "c1", variety: "Kulai Red", workerId: "w5", status: "Preparing",
-      cycle: { sowing: "2026-08-28", planting: "2026-09-25" } },
+      cycle: { sowing: "2026-08-28", planting: "2026-09-25" },
+      history: [] },
     { id: "p7", farmId: "f3", name: "Plot B", sizeAcres: 2, cropId: "c2", variety: "Long Bean 101", workerId: "w2", status: "Fallow",
-      cycle: { fallow: "2026-08-20" } },
+      cycle: { fallow: "2026-08-20" },
+      history: [] },
   ],
 
   contracts: [

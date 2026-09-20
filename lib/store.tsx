@@ -21,7 +21,7 @@ function migrate(db: DB): DB {
     plots: (db.plots ?? []).map((p) => {
       const cycle = { ...(p.cycle ?? {}) };
       if (!cycle.planting && p.plantedDate) cycle.planting = p.plantedDate;
-      return { ...p, cycle };
+      return { ...p, cycle, history: p.history ?? [] };
     }),
     // scheduled tasks used to carry a `notes` field; it is now `remarks`
     tasks: (db.tasks ?? []).map((t) => {
