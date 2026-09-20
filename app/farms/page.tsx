@@ -40,6 +40,7 @@ export default function FarmsPage() {
   const [deletePlot, setDeletePlot] = useState<Plot | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [historyFarm, setHistoryFarm] = useState<Farm | null>(null);
+  const [completePlot, setCompletePlot] = useState<Plot | null>(null);
 
   /* ---------- deletion, with every linked record accounted for ---------- */
 
@@ -98,6 +99,32 @@ export default function FarmsPage() {
 
   const setStatus = (plotId: string, status: Plot["status"]) =>
     update("plots", (list) => list.map((p) => (p.id === plotId ? { ...p, status } : p)));
+
+  /** Archives the plot's current cycle into its history, clears the cycle
+   *  dates and resets it to "Preparing" so the next planting can begin. */
+  const completeCycle = (plot: Plot) => {
+    update("plots", (list) =>
+      list.map((p) => {
+        if (p.id !== plot.id) return p;
+        const hasDates = Object.keys(p.cycle ?? {}).length > 0;
+        const history = hasDates
+          ? [
+              {
+                id: newId("cyc"),
+                cropId: p.cropId,
+                variety: p.variety,
+                workerId: p.workerId,
+                cycle: p.cycle,
+                archivedAt: new Date().toISOString().slice(0, 10),
+              },
+              ...(p.history ?? []),
+            ]
+          : (p.history ?? []);
+        return { ...p, cycle: {}, history, status: "Preparing" };
+      })
+    );
+    setCompletePlot(null);
+  };
 
   /* ---------- summary ---------- */
   const totalAcres = db.farms.reduce((s, f) => s + f.sizeAcres, 0);
@@ -261,7 +288,10 @@ export default function FarmsPage() {
                           <Td>
                             <select
                               value={p.status}
-                              onChange={(e) => setStatus(p.id, e.target.value as Plot["status"])}
+                              onChange={(e) => {
+                                if (e.target.value === "Completed") setCompletePlot(p);
+                                else setStatus(p.id, e.target.value as Plot["status"]);
+                              }}
                               aria-label={`Status for ${p.name}`}
                               className={`rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-medium ${
                                 p.status === "Active"
@@ -274,6 +304,7 @@ export default function FarmsPage() {
                               <option>Active</option>
                               <option>Preparing</option>
                               <option>Fallow</option>
+                              <option value="Completed">Completed — archive to History</option>
                             </select>
                           </Td>
                           <Td>
@@ -325,6 +356,15 @@ export default function FarmsPage() {
         />
       )}
       {historyFarm && <FarmHistoryModal farm={historyFarm} onClose={() => setHistoryFarm(null)} />}
+      {completePlot && (
+        <ConfirmDialog
+          title={`Mark ${completePlot.name} as completed?`}
+          message={`The current crop cycle will be saved to this farm's History, and “${completePlot.name}” will be reset to “Preparing” so you can record the next planting.`}
+          confirmLabel="Mark Completed"
+          onConfirm={() => completeCycle(completePlot)}
+          onClose={() => setCompletePlot(null)}
+        />
+      )}
       {deleteFarm && (
         <ConfirmDialog
           title={`Delete ${deleteFarm.name}?`}
