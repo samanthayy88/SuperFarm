@@ -19,17 +19,19 @@ const nav = [
   { href: "/projects", label: "Setup Projects", icon: "⚒", group: "Money" },
   { href: "/inventory", label: "Purchases & Inventory", icon: "▧", group: "Operations" },
   { href: "/applications", label: "Spray Applications", icon: "❋", group: "Operations" },
+  { href: "/settings", label: "Settings", icon: "⚙", group: "Settings" },
 ];
 
-const groups = ["Monitor", "People", "Money", "Operations"];
+const groups = ["Monitor", "People", "Money", "Operations", "Settings"];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { resetData } = useStore();
+  const { db, resetData } = useStore();
+  const { appName, appSubtitle, logoDataUrl } = db.settings;
   // drawer state; only applies below the lg breakpoint (nav links close it on click)
   const [open, setOpen] = useState(false);
 
-  const current = nav.find((n) => n.href === pathname)?.label ?? "Farm Manager";
+  const current = nav.find((n) => n.href === pathname)?.label ?? appName;
 
   return (
     <>
@@ -65,15 +67,24 @@ export default function Sidebar() {
       >
         <div className="flex items-start justify-between gap-2 px-4 py-4">
           <div className="flex items-center gap-2.5">
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-on-accent"
-              aria-hidden
-            >
-              F
-            </span>
+            {logoDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoDataUrl}
+                alt={`${appName} logo`}
+                className="h-8 w-8 rounded-lg object-contain"
+              />
+            ) : (
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-on-accent"
+                aria-hidden
+              >
+                {(appName.trim()[0] ?? "F").toUpperCase()}
+              </span>
+            )}
             <div>
-              <p className="text-sm font-semibold tracking-tight text-ink">Farm Manager</p>
-              <p className="text-xs text-muted">Multi-farm operations</p>
+              <p className="text-sm font-semibold tracking-tight text-ink">{appName}</p>
+              {appSubtitle && <p className="text-xs text-muted">{appSubtitle}</p>}
             </div>
           </div>
           <button

@@ -28,6 +28,7 @@ import {
   averageCycleDaysByCrop,
 } from "@/lib/utils";
 import { Farm, Plot, PlotCycle, PlotCycleRecord, PLOT_STAGES, PLOT_STAGE_LABELS } from "@/lib/types";
+import VarietySelect from "@/components/VarietySelect";
 
 export default function FarmsPage() {
   const { db, update, setDB } = useStore();
@@ -670,10 +671,12 @@ function HistoryRecordForm({ row, onClose }: { row: HistoryRow; onClose: () => v
             </Select>
           </Field>
           <Field label="Variety">
-            <TextInput
+            <VarietySelect
+              cropId={form.cropId}
+              varieties={db.varieties}
               value={form.variety}
-              onChange={(e) => setForm({ ...form, variety: e.target.value })}
-              placeholder="e.g. Kulai Red, Bara F1"
+              onChange={(v) => setForm({ ...form, variety: v })}
+              anyLabel="No variety"
             />
           </Field>
           <Field label="Managed by worker">
@@ -902,10 +905,12 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
             </Select>
           </Field>
           <Field label="Variety">
-            <TextInput
+            <VarietySelect
+              cropId={form.cropId}
+              varieties={db.varieties}
               value={form.variety}
-              onChange={(e) => setForm({ ...form, variety: e.target.value })}
-              placeholder="e.g. Kulai Red, Bara F1"
+              onChange={(v) => setForm({ ...form, variety: v })}
+              anyLabel="No variety"
             />
           </Field>
           <Field label="Managed by worker">

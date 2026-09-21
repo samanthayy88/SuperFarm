@@ -5,6 +5,7 @@ import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, computePayroll, commissionRateFor, lastNMonthKeys, monthLabel, PayrollLine } from "@/lib/utils";
 import { HarvestRecord } from "@/lib/types";
+import VarietySelect from "@/components/VarietySelect";
 
 export default function PayrollPage() {
   const { db, update } = useStore();
@@ -387,10 +388,12 @@ function HarvestForm({ onClose }: { onClose: () => void }) {
           </Select>
         </Field>
         <Field label="Variety">
-          <TextInput
+          <VarietySelect
+            cropId={plot?.cropId ?? ""}
+            varieties={db.varieties}
             value={form.variety}
-            onChange={(e) => setForm({ ...form, variety: e.target.value })}
-            placeholder="e.g. Kulai Red, Bara F1"
+            onChange={(v) => setForm({ ...form, variety: v })}
+            anyLabel="No variety"
           />
         </Field>
         <div className="rounded border border-hairline bg-surface-2 p-3 text-sm">

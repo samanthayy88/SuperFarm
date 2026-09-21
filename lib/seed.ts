@@ -20,6 +20,19 @@ export const seedDB: DB = {
     { id: "c4", name: "Okra", commissionRatePerKg: 0.25 },
   ],
 
+  varieties: [
+    { id: "v1", cropId: "c1", name: "Kulai Red" },
+    { id: "v2", cropId: "c1", name: "Bara F1" },
+    { id: "v3", cropId: "c2", name: "Long Bean 101" },
+    { id: "v4", cropId: "c3", name: "Green Star" },
+    { id: "v5", cropId: "c4", name: "Clemson Spineless" },
+  ],
+
+  settings: {
+    appName: "Farm Manager",
+    appSubtitle: "Multi-farm operations",
+  },
+
   farms: [
     {
       id: "f1",

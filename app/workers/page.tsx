@@ -22,6 +22,7 @@ import {
 import { fmtRM, fmtDate, harvestTargetActualKg } from "@/lib/utils";
 import { Worker, WorkerCommissionSetting, WorkerHarvestTarget } from "@/lib/types";
 import GroupedBarChart, { GroupedBarDatum } from "@/components/GroupedBarChart";
+import VarietySelect from "@/components/VarietySelect";
 
 export default function WorkersPage() {
   const { db, setDB } = useStore();
@@ -448,11 +449,7 @@ function CommissionSettingForm({
             </Select>
           </Field>
           <Field label="Variety (blank = any variety)">
-            <TextInput
-              value={form.variety}
-              onChange={(e) => setForm({ ...form, variety: e.target.value })}
-              placeholder="e.g. Kulai Red"
-            />
+            <VarietySelect cropId={form.cropId} varieties={db.varieties} value={form.variety} onChange={(v) => setForm({ ...form, variety: v })} />
           </Field>
           <Field label="Rate (RM per kg)">
             <TextInput
@@ -576,10 +573,11 @@ function HarvestTargetsTab() {
           </Select>
         </Field>
         <Field label="Variety">
-          <TextInput
+          <VarietySelect
+            cropId={filters.cropId}
+            varieties={db.varieties}
             value={filters.variety}
-            onChange={(e) => setFilters({ ...filters, variety: e.target.value })}
-            placeholder="Any"
+            onChange={(v) => setFilters({ ...filters, variety: v })}
           />
         </Field>
         <Field label="Worker">
@@ -791,11 +789,7 @@ function HarvestTargetForm({ target, onClose }: { target?: WorkerHarvestTarget; 
             </Select>
           </Field>
           <Field label="Variety (blank = any)">
-            <TextInput
-              value={form.variety}
-              onChange={(e) => setForm({ ...form, variety: e.target.value })}
-              placeholder="e.g. Kulai Red"
-            />
+            <VarietySelect cropId={form.cropId} varieties={db.varieties} value={form.variety} onChange={(v) => setForm({ ...form, variety: v })} />
           </Field>
         </div>
         <div className="flex justify-end gap-2 pt-1">

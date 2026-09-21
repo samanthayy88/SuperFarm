@@ -66,6 +66,13 @@ export interface Crop {
   commissionRatePerKg: number; // RM per kg harvested, paid to worker
 }
 
+/** A named variety of one crop, selectable everywhere a variety is recorded. */
+export interface Variety {
+  id: string;
+  cropId: string;
+  name: string;
+}
+
 // ---------- Rental contracts ----------
 export interface RentalContract {
   id: string;
@@ -283,11 +290,19 @@ export interface ApplicationRecord {
   notes?: string;
 }
 
+// ---------- App settings (Settings → Dashboard) ----------
+export interface AppSettings {
+  appName: string;
+  appSubtitle: string;
+  logoDataUrl?: string;
+}
+
 // ---------- Root DB ----------
 export interface DB {
   farms: Farm[];
   plots: Plot[];
   crops: Crop[];
+  varieties: Variety[];
   contracts: RentalContract[];
   loans: Loan[];
   projects: SetupProject[];
@@ -304,4 +319,5 @@ export interface DB {
   purchases: Purchase[];
   usageLogs: UsageLog[];
   applications: ApplicationRecord[];
+  settings: AppSettings;
 }
