@@ -9,6 +9,7 @@ import {
   PlotStage,
   PLOT_STAGES,
   PLOT_STAGE_LABELS,
+  WorkerHarvestTarget,
 } from "./types";
 
 export const TODAY = new Date();
@@ -121,6 +122,48 @@ export function saleOverdueDays(s: SaleRecord, termDays: number): number {
   return Math.max(0, daysBetween(saleDueDate(s, termDays), TODAY));
 }
 
+// ---------- Worker commission settings ----------
+
+/**
+ * Effective RM/kg for one worker's harvest on a given plot+crop(+variety).
+ * Prefers a worker-level WorkerCommissionSetting matching the exact variety,
+ * then one set for "any variety" on that plot, before falling back to the
+ * crop's global `commissionRatePerKg`.
+ */
+export function commissionRateFor(
+  db: DB,
+  workerId: string,
+  plotId: string,
+  cropId: string,
+  variety?: string
+): number {
+  const settings = db.commissionSettings.filter(
+    (s) => s.workerId === workerId && s.plotId === plotId && s.cropId === cropId
+  );
+  const exact = variety ? settings.find((s) => s.variety === variety) : undefined;
+  const anyVariety = settings.find((s) => !s.variety);
+  const match = exact ?? anyVariety;
+  if (match) return match.ratePerKg;
+  return db.crops.find((c) => c.id === cropId)?.commissionRatePerKg ?? 0;
+}
+
+// ---------- Worker harvest targets ----------
+
+/** Total kg harvested by this target's worker on its farm/plot/crop(/variety) within its date range. */
+export function harvestTargetActualKg(db: DB, target: WorkerHarvestTarget): number {
+  return db.harvests
+    .filter(
+      (h) =>
+        h.workerId === target.workerId &&
+        h.plotId === target.plotId &&
+        h.cropId === target.cropId &&
+        h.date >= target.startDate &&
+        h.date <= target.endDate &&
+        (!target.variety || h.variety === target.variety)
+    )
+    .reduce((s, h) => s + h.quantityKg, 0);
+}
+
 // ---------- Payroll ----------
 export interface PayrollLine {
   workerId: string;
@@ -139,11 +182,15 @@ export function computePayroll(db: DB, month: string): PayrollLine[] {
       const harvests = db.harvests.filter(
         (h) => h.workerId === w.id && h.date.startsWith(month)
       );
-      const byCrop = new Map<string, number>();
-      for (const h of harvests) byCrop.set(h.cropId, (byCrop.get(h.cropId) ?? 0) + h.quantityKg);
-      const commissionByCrop = [...byCrop.entries()].map(([cropId, kg]) => {
-        const rate = db.crops.find((c) => c.id === cropId)?.commissionRatePerKg ?? 0;
-        return { cropId, kg, rate, amount: kg * rate };
+      const byCrop = new Map<string, typeof harvests>();
+      for (const h of harvests) byCrop.set(h.cropId, [...(byCrop.get(h.cropId) ?? []), h]);
+      const commissionByCrop = [...byCrop.entries()].map(([cropId, list]) => {
+        const kg = list.reduce((s, h) => s + h.quantityKg, 0);
+        const amount = list.reduce(
+          (s, h) => s + h.quantityKg * commissionRateFor(db, w.id, h.plotId, cropId, h.variety),
+          0
+        );
+        return { cropId, kg, rate: kg > 0 ? amount / kg : 0, amount };
       });
       const commissionTotal = commissionByCrop.reduce((s, c) => s + c.amount, 0);
       const deductions = db.workerExpenses

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, computePayroll, lastNMonthKeys, monthLabel, PayrollLine } from "@/lib/utils";
+import { fmtRM, fmtRM0, fmtDate, computePayroll, commissionRateFor, lastNMonthKeys, monthLabel, PayrollLine } from "@/lib/utils";
 import { HarvestRecord } from "@/lib/types";
 
 export default function PayrollPage() {
@@ -186,6 +186,7 @@ function HarvestTable({ month }: { month: string }) {
           <Th>Worker</Th>
           <Th>Farm / Plot</Th>
           <Th>Crop</Th>
+          <Th>Variety</Th>
           <Th right>Quantity</Th>
           <Th right>Rate/kg</Th>
           <Th right>Commission</Th>
@@ -197,13 +198,14 @@ function HarvestTable({ month }: { month: string }) {
           const plot = db.plots.find((p) => p.id === h.plotId);
           const farm = db.farms.find((f) => f.id === plot?.farmId)?.name ?? "—";
           const crop = db.crops.find((c) => c.id === h.cropId);
-          const rate = crop?.commissionRatePerKg ?? 0;
+          const rate = commissionRateFor(db, h.workerId, h.plotId, h.cropId, h.variety);
           return (
             <tr key={h.id}>
               <Td>{fmtDate(h.date)}</Td>
               <Td>{worker}</Td>
               <Td>{farm} · {plot?.name ?? "—"}</Td>
               <Td>{crop?.name ?? "—"}</Td>
+              <Td>{h.variety || <span className="text-muted">—</span>}</Td>
               <Td right>{h.quantityKg.toLocaleString()} kg</Td>
               <Td right>RM {rate.toFixed(2)}</Td>
               <Td right>{fmtRM(h.quantityKg * rate)}</Td>
@@ -325,9 +327,11 @@ function PayslipModal({ line, month, onClose }: { line: PayrollLine; month: stri
 
 function HarvestForm({ onClose }: { onClose: () => void }) {
   const { db, update } = useStore();
+  const firstPlot = db.plots[0];
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
-    plotId: db.plots[0]?.id ?? "",
+    plotId: firstPlot?.id ?? "",
+    variety: firstPlot?.variety ?? "",
     quantityKg: "",
   });
 
@@ -335,7 +339,13 @@ function HarvestForm({ onClose }: { onClose: () => void }) {
   const crop = db.crops.find((c) => c.id === plot?.cropId);
   const worker = db.workers.find((w) => w.id === plot?.workerId);
   const qty = Number(form.quantityKg) || 0;
-  const commission = qty * (crop?.commissionRatePerKg ?? 0);
+  const rate = plot && crop ? commissionRateFor(db, plot.workerId, plot.id, crop.id, form.variety || undefined) : 0;
+  const commission = qty * rate;
+
+  const setPlot = (plotId: string) => {
+    const p = db.plots.find((x) => x.id === plotId);
+    setForm({ ...form, plotId, variety: p?.variety ?? "" });
+  };
 
   const submit = () => {
     if (!plot || !qty) return;
@@ -345,6 +355,7 @@ function HarvestForm({ onClose }: { onClose: () => void }) {
       plotId: plot.id,
       workerId: plot.workerId,
       cropId: plot.cropId,
+      variety: form.variety.trim() || undefined,
       quantityKg: qty,
     };
     update("harvests", (list) => [...list, h]);
@@ -354,11 +365,16 @@ function HarvestForm({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Record Harvest" onClose={onClose}>
       <div className="space-y-3">
-        <Field label="Date">
-          <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date">
+            <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          </Field>
+          <Field label="Quantity harvested (kg)">
+            <TextInput type="number" value={form.quantityKg} onChange={(e) => setForm({ ...form, quantityKg: e.target.value })} />
+          </Field>
+        </div>
         <Field label="Plot">
-          <Select value={form.plotId} onChange={(e) => setForm({ ...form, plotId: e.target.value })}>
+          <Select value={form.plotId} onChange={(e) => setPlot(e.target.value)}>
             {db.plots.map((p) => {
               const f = db.farms.find((x) => x.id === p.farmId)?.name;
               const c = db.crops.find((x) => x.id === p.cropId)?.name;
@@ -370,13 +386,17 @@ function HarvestForm({ onClose }: { onClose: () => void }) {
             })}
           </Select>
         </Field>
-        <Field label="Quantity harvested (kg)">
-          <TextInput type="number" value={form.quantityKg} onChange={(e) => setForm({ ...form, quantityKg: e.target.value })} />
+        <Field label="Variety">
+          <TextInput
+            value={form.variety}
+            onChange={(e) => setForm({ ...form, variety: e.target.value })}
+            placeholder="e.g. Kulai Red, Bara F1"
+          />
         </Field>
         <div className="rounded border border-hairline bg-surface-2 p-3 text-sm">
           <p className="text-muted">Auto-assigned</p>
           <p className="mt-1 text-ink-2">Worker: <span className="font-medium">{worker?.name ?? "—"}</span></p>
-          <p className="text-ink-2">Crop: <span className="font-medium">{crop?.name ?? "—"}</span> at RM {(crop?.commissionRatePerKg ?? 0).toFixed(2)}/kg</p>
+          <p className="text-ink-2">Crop: <span className="font-medium">{crop?.name ?? "—"}</span> at RM {rate.toFixed(2)}/kg</p>
           <p className="mt-1 text-ink">Commission for this harvest: <span className="font-semibold">{fmtRM(commission)}</span></p>
         </div>
         <div className="flex justify-end gap-2 pt-2">

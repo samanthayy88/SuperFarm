@@ -113,12 +113,42 @@ export interface Worker {
   id: string;
   name: string;
   idNumber: string; // IC / passport
+  dob?: string;
   phone: string;
   nationality: string;
   joinDate: string;
   baseSalary: number;
-  farmId: string;
+  farmId: string; // farm in charge
   active: boolean;
+}
+
+/**
+ * A worker's harvest-commission rate for one farm+plot+crop(+variety),
+ * overriding the crop's global `commissionRatePerKg` for that worker.
+ * Matching prefers an exact variety match, then a blank-variety ("any
+ * variety") setting, before falling back to the crop's global rate.
+ */
+export interface WorkerCommissionSetting {
+  id: string;
+  workerId: string;
+  farmId: string;
+  plotId: string;
+  cropId: string;
+  variety?: string; // blank = applies to any variety of this crop on this plot
+  ratePerKg: number; // RM per kg harvested
+}
+
+/** A target harvest volume for a worker over a date range, on one farm+plot+crop(+variety). */
+export interface WorkerHarvestTarget {
+  id: string;
+  workerId: string;
+  startDate: string;
+  endDate: string;
+  farmId: string;
+  plotId: string;
+  cropId: string;
+  variety?: string; // blank = any variety
+  targetKg: number;
 }
 
 export type WorkerExpenseType =
@@ -145,6 +175,7 @@ export interface HarvestRecord {
   plotId: string;
   workerId: string;
   cropId: string;
+  variety?: string;
   quantityKg: number;
 }
 
@@ -262,6 +293,8 @@ export interface DB {
   projects: SetupProject[];
   workers: Worker[];
   workerExpenses: WorkerExpense[];
+  commissionSettings: WorkerCommissionSetting[];
+  harvestTargets: WorkerHarvestTarget[];
   harvests: HarvestRecord[];
   tasks: ScheduleTask[];
   collectors: Collector[];
