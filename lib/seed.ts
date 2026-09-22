@@ -295,7 +295,12 @@ export const seedDB: DB = {
   ],
 
   collectors: [
-    { id: "cl1", name: "Ah Seng Vegetables (demo)", phone: "000-000 0101", paymentTermDays: 3 },
+    {
+      id: "cl1", name: "Ah Seng Vegetables (demo)", phone: "000-000 0101", paymentTermDays: 3,
+      businessRegNo: "DEMO-SSM-0001", picName: "Tan Ah Seng", email: "ahseng@example.com",
+      officeAddress: "12 Jalan Pasar, 27600 Raub, Pahang", tinNumber: "DEMO-TIN-0001",
+      bankAccount: { bankName: "Maybank", recipientName: "Ah Seng Vegetables Sdn Bhd", accountNumber: "000000000001" },
+    },
     { id: "cl2", name: "GreenFresh Trading (demo)", phone: "000-000 0102", paymentTermDays: 7 },
     { id: "cl3", name: "Pasar Borong Selangor (demo)", phone: "000-000 0103", paymentTermDays: 2 },
   ],
@@ -386,7 +391,12 @@ export const seedDB: DB = {
   ],
 
   suppliers: [
-    { id: "sp1", name: "Agro Tani Supplies (demo)", phone: "000-000 0201" },
+    {
+      id: "sp1", name: "Agro Tani Supplies (demo)", phone: "000-000 0201", paymentTermDays: 30,
+      businessRegNo: "DEMO-SSM-0101", picName: "Rahman Ismail", email: "sales@agrotani.example.com",
+      officeAddress: "45 Jalan Industri 3, 28700 Bentong, Pahang", tinNumber: "DEMO-TIN-0101",
+      bankAccount: { bankName: "CIMB Bank", recipientName: "Agro Tani Supplies Sdn Bhd", accountNumber: "000000000101" },
+    },
     { id: "sp2", name: "Kim Huat Fertilizer (demo)", phone: "000-000 0202" },
     { id: "sp3", name: "Ladang Mart (demo)", phone: "000-000 0203" },
   ],

@@ -19,7 +19,9 @@ const nav = [
   { href: "/projects", label: "Setup Projects", icon: "⚒", group: "Money" },
   { href: "/inventory", label: "Purchases & Inventory", icon: "▧", group: "Operations" },
   { href: "/applications", label: "Spray Applications", icon: "❋", group: "Operations" },
-  { href: "/settings", label: "Settings", icon: "⚙", group: "Settings" },
+  { href: "/settings/crop-variety", label: "Crop & Variety", icon: "❖", group: "Settings" },
+  { href: "/settings/dashboard", label: "Dashboard Setting", icon: "⚙", group: "Settings" },
+  { href: "/settings/collectors-vendors", label: "Collectors & Vendors", icon: "◫", group: "Settings" },
 ];
 
 const groups = ["Monitor", "People", "Money", "Operations", "Settings"];

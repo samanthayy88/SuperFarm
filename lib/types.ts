@@ -199,10 +199,27 @@ export interface ScheduleTask {
   remarks?: string;
 }
 
+// ---------- Business partner details (Collectors & Vendors) ----------
+export interface BankAccount {
+  bankName: string;
+  recipientName: string;
+  accountNumber: string;
+}
+
+/** Shared business-profile fields, set from Settings → Collectors & Vendors. */
+export interface BusinessProfile {
+  businessRegNo?: string;
+  picName?: string; // person in charge
+  email?: string;
+  officeAddress?: string;
+  tinNumber?: string;
+  bankAccount?: BankAccount;
+}
+
 // ---------- Collectors & sales ----------
-export interface Collector {
+export interface Collector extends BusinessProfile {
   id: string;
-  name: string;
+  name: string; // business name
   phone: string;
   paymentTermDays: number; // usually 2-7 days
 }
@@ -224,11 +241,12 @@ export interface SaleRecord {
   paymentReceivedDate?: string;
 }
 
-// ---------- Suppliers, purchases, inventory ----------
-export interface Supplier {
+// ---------- Suppliers (Vendors), purchases, inventory ----------
+export interface Supplier extends BusinessProfile {
   id: string;
-  name: string;
+  name: string; // business name
   phone: string;
+  paymentTermDays?: number;
 }
 
 export interface InventoryItem {
