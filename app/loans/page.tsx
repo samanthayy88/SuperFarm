@@ -2,14 +2,20 @@
 
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard } from "@/components/ui";
+import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard, EmptyState, ConfirmDialog } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, unpaidLoanMonths, loanBalance, currentMonthKey, monthLabel, lastNMonthKeys } from "@/lib/utils";
 import { Loan } from "@/lib/types";
 
 export default function LoansPage() {
   const { db, update } = useStore();
-  const [showForm, setShowForm] = useState(false);
+  const [loanForm, setLoanForm] = useState<{ mode: "add" } | { mode: "edit"; loan: Loan } | null>(null);
+  const [deleteLoan, setDeleteLoan] = useState<Loan | null>(null);
   const curMonth = currentMonthKey();
+
+  const doDeleteLoan = (loan: Loan) => {
+    update("loans", (list) => list.filter((l) => l.id !== loan.id));
+    setDeleteLoan(null);
+  };
 
   const totalBorrowed = db.loans.reduce((s, l) => s + l.principal, 0);
   const totalBalance = db.loans.reduce((s, l) => s + loanBalance(l), 0);
@@ -38,7 +44,7 @@ export default function LoansPage() {
       <PageHeader
         title="Loans & Repayments"
         subtitle="Bank, relatives and friends — installments, balances and missed payments"
-        actions={<Button onClick={() => setShowForm(true)}>+ Add Loan</Button>}
+        actions={<Button onClick={() => setLoanForm({ mode: "add" })}>+ Add Loan</Button>}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -49,11 +55,29 @@ export default function LoansPage() {
       </div>
 
       <div className="space-y-4">
+        {db.loans.length === 0 && (
+          <Card>
+            <EmptyState message="No loans yet. Use “+ Add Loan” to add your first one." />
+          </Card>
+        )}
         {db.loans.map((l) => {
           const missed = unpaidLoanMonths(l).filter((m) => m < curMonth);
           const dueNow = unpaidLoanMonths(l).includes(curMonth);
           return (
-            <Card key={l.id} title={`${l.lender}`}>
+            <Card
+              key={l.id}
+              title={`${l.lender}`}
+              actions={
+                <div className="flex gap-2">
+                  <Button small variant="ghost" onClick={() => setLoanForm({ mode: "edit", loan: l })}>
+                    Edit
+                  </Button>
+                  <Button small variant="danger" onClick={() => setDeleteLoan(l)}>
+                    Delete
+                  </Button>
+                </div>
+              }
+            >
               <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                 <Badge tone={l.lenderType === "Bank" ? "accent" : "neutral"}>{l.lenderType}</Badge>
                 <span className="text-ink-2"><span className="text-muted">Principal:</span> {fmtRM0(l.principal)}</span>
@@ -108,28 +132,39 @@ export default function LoansPage() {
         })}
       </div>
 
-      {showForm && <LoanForm onClose={() => setShowForm(false)} />}
+      {loanForm && (
+        <LoanForm loan={loanForm.mode === "edit" ? loanForm.loan : undefined} onClose={() => setLoanForm(null)} />
+      )}
+      {deleteLoan && (
+        <ConfirmDialog
+          title={`Delete ${deleteLoan.lender}?`}
+          message={`“${deleteLoan.lender}” and its full payment history will be permanently removed.`}
+          confirmLabel="Delete loan"
+          onConfirm={() => doDeleteLoan(deleteLoan)}
+          onClose={() => setDeleteLoan(null)}
+        />
+      )}
     </div>
   );
 }
 
-function LoanForm({ onClose }: { onClose: () => void }) {
+function LoanForm({ loan, onClose }: { loan?: Loan; onClose: () => void }) {
   const { update } = useStore();
+  const editing = Boolean(loan);
   const [form, setForm] = useState({
-    lender: "",
-    lenderType: "Bank" as Loan["lenderType"],
-    principal: "",
-    interestRatePct: "",
-    monthlyInstallment: "",
-    startDate: "",
-    tenureMonths: "",
-    notes: "",
+    lender: loan?.lender ?? "",
+    lenderType: loan?.lenderType ?? ("Bank" as Loan["lenderType"]),
+    principal: loan ? String(loan.principal) : "",
+    interestRatePct: loan ? String(loan.interestRatePct) : "",
+    monthlyInstallment: loan ? String(loan.monthlyInstallment) : "",
+    startDate: loan?.startDate ?? "",
+    tenureMonths: loan ? String(loan.tenureMonths) : "",
+    notes: loan?.notes ?? "",
   });
 
   const submit = () => {
     if (!form.lender || !form.startDate) return;
-    const l: Loan = {
-      id: newId("l"),
+    const payload = {
       lender: form.lender,
       lenderType: form.lenderType,
       principal: Number(form.principal) || 0,
@@ -137,15 +172,18 @@ function LoanForm({ onClose }: { onClose: () => void }) {
       monthlyInstallment: Number(form.monthlyInstallment) || 0,
       startDate: form.startDate,
       tenureMonths: Number(form.tenureMonths) || 12,
-      paidMonths: [],
       notes: form.notes || undefined,
     };
-    update("loans", (list) => [...list, l]);
+    if (loan) {
+      update("loans", (list) => list.map((l) => (l.id === loan.id ? { ...l, ...payload } : l)));
+    } else {
+      update("loans", (list) => [...list, { id: newId("l"), ...payload, paidMonths: [] }]);
+    }
     onClose();
   };
 
   return (
-    <Modal title="Add Loan" onClose={onClose}>
+    <Modal title={editing ? `Edit ${loan!.lender}` : "Add Loan"} onClose={onClose}>
       <div className="space-y-3">
         <Field label="Lender name">
           <TextInput value={form.lender} onChange={(e) => setForm({ ...form, lender: e.target.value })} />
@@ -179,7 +217,7 @@ function LoanForm({ onClose }: { onClose: () => void }) {
         </Field>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit}>Save Loan</Button>
+          <Button onClick={submit}>{editing ? "Save changes" : "Save Loan"}</Button>
         </div>
       </div>
     </Modal>
