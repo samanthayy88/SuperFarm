@@ -280,6 +280,25 @@ export interface Purchase {
   notes?: string;
 }
 
+// ---------- Ad-hoc company payments (Expenses → Payment) ----------
+export type PaymentCategory =
+  | "Utilities"
+  | "Rental/Office"
+  | "Transport"
+  | "Professional Fees"
+  | "Bank Charges"
+  | "Other";
+
+export interface Payment {
+  id: string;
+  date: string;
+  category: PaymentCategory;
+  payee: string;
+  description: string;
+  amount: number;
+  notes?: string;
+}
+
 export interface UsageLog {
   id: string;
   date: string;
@@ -335,6 +354,7 @@ export interface DB {
   suppliers: Supplier[];
   items: InventoryItem[];
   purchases: Purchase[];
+  payments: Payment[];
   usageLogs: UsageLog[];
   applications: ApplicationRecord[];
   settings: AppSettings;

@@ -494,6 +494,13 @@ export const seedDB: DB = {
     },
   ],
 
+  payments: [
+    { id: "pm1", date: "2026-07-06", category: "Utilities", payee: "Tenaga Nasional Berhad", description: "Electricity - farm office & pump house", amount: 320, notes: "TNB account 000-000-0001" },
+    { id: "pm2", date: "2026-07-14", category: "Transport", payee: "Petronas Raub", description: "Diesel for water pump + lorry", amount: 260 },
+    { id: "pm3", date: "2026-07-20", category: "Professional Fees", payee: "Ali & Co. Accountants", description: "Monthly bookkeeping fee", amount: 450 },
+    { id: "pm4", date: "2026-06-10", category: "Bank Charges", payee: "Maybank", description: "Account maintenance + cheque book", amount: 35 },
+  ],
+
   usageLogs: [
     { id: "u1", date: "2026-07-08", itemId: "i1", quantity: 3, purpose: "Side dressing - Plot A/B", farmId: "f1" },
     { id: "u2", date: "2026-07-15", itemId: "i2", quantity: 12, purpose: "Base fertilizer new beds", farmId: "f3" },

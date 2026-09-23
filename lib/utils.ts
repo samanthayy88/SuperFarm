@@ -10,6 +10,7 @@ import {
   PLOT_STAGES,
   PLOT_STAGE_LABELS,
   WorkerHarvestTarget,
+  Purchase,
 } from "./types";
 
 export const TODAY = new Date();
@@ -207,6 +208,11 @@ export function computePayroll(db: DB, month: string): PayrollLine[] {
         netPay: w.baseSalary + commissionTotal - deductionTotal,
       };
     });
+}
+
+// ---------- Purchases ----------
+export function purchaseTotal(p: Purchase): number {
+  return p.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
 }
 
 // ---------- Applications ----------

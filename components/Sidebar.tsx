@@ -7,24 +7,39 @@ import { useStore } from "@/lib/store";
 import ThemeToggle from "./ThemeToggle";
 
 const nav = [
-  { href: "/", label: "Overview", icon: "▦", group: "Monitor" },
-  { href: "/farms", label: "Farms & Plots", icon: "⬡", group: "Monitor" },
-  { href: "/schedule", label: "Schedule", icon: "▣", group: "Monitor" },
+  { href: "/", label: "Overview", icon: "▦", group: "Overview" },
+  { href: "/data-analysis", label: "Data & Analysis", icon: "◐", group: "Overview" },
+
+  { href: "/farms", label: "Farms & Plots", icon: "⬡", group: "My Farm" },
+  { href: "/contracts", label: "Rental Contracts", icon: "▤", group: "My Farm" },
+
   { href: "/workers", label: "My Workers", icon: "◉", group: "People" },
-  { href: "/worker-expenses", label: "Worker Expenses", icon: "▩", group: "People" },
   { href: "/payroll", label: "Payroll", icon: "▥", group: "People" },
-  { href: "/sales", label: "Sales & Collectors", icon: "◍", group: "Money" },
-  { href: "/contracts", label: "Rental Contracts", icon: "▤", group: "Money" },
-  { href: "/loans", label: "Loans", icon: "◈", group: "Money" },
-  { href: "/projects", label: "Setup Projects", icon: "⚒", group: "Money" },
-  { href: "/inventory", label: "Purchases & Inventory", icon: "▧", group: "Operations" },
-  { href: "/applications", label: "Spray Applications", icon: "❋", group: "Operations" },
-  { href: "/settings/crop-variety", label: "Crop & Variety", icon: "❖", group: "Settings" },
-  { href: "/settings/dashboard", label: "Dashboard Setting", icon: "⚙", group: "Settings" },
-  { href: "/settings/collectors-vendors", label: "Collectors & Vendors", icon: "◫", group: "Settings" },
+
+  { href: "/loans", label: "Borrowings", icon: "◈", group: "Loans" },
+
+  { href: "/harvest-record", label: "Harvest Record", icon: "✳", group: "Income" },
+  { href: "/sales", label: "Sales Record", icon: "◍", group: "Income" },
+
+  { href: "/purchases", label: "Purchases", icon: "▨", group: "Expenses" },
+  { href: "/payment", label: "Payment", icon: "◑", group: "Expenses" },
+  { href: "/worker-expenses", label: "Worker Expenses", icon: "▩", group: "Expenses" },
+  { href: "/salary", label: "Salary", icon: "◔", group: "Expenses" },
+
+  { href: "/inventory", label: "Stock Level", icon: "▧", group: "Inventory" },
+
+  { href: "/schedule", label: "Task Schedule", icon: "▣", group: "Operation" },
+  { href: "/applications", label: "Agri Inputs", icon: "❋", group: "Operation" },
+
+  { href: "/projects", label: "Setup Projects", icon: "⚒", group: "Operation" },
+
+  { href: "/settings/crop-variety", label: "Crop & Variety", icon: "❖", group: "Setting" },
+  { href: "/settings/collectors", label: "Collectors", icon: "◫", group: "Setting" },
+  { href: "/settings/vendors", label: "Vendors", icon: "◨", group: "Setting" },
+  { href: "/settings/dashboard", label: "Dashboard", icon: "⚙", group: "Setting" },
 ];
 
-const groups = ["Monitor", "People", "Money", "Operations", "Settings"];
+const groups = ["Overview", "My Farm", "People", "Loans", "Income", "Expenses", "Inventory", "Operation", "Setting"];
 
 export default function Sidebar() {
   const pathname = usePathname();
