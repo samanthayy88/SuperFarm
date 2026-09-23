@@ -123,6 +123,23 @@ export function saleOverdueDays(s: SaleRecord, termDays: number): number {
   return Math.max(0, daysBetween(saleDueDate(s, termDays), TODAY));
 }
 
+// ---------- Harvest ↔ sale stock (so kg isn't typed twice) ----------
+
+/** Total kg ever harvested for a crop, across all plots and dates. */
+export function totalHarvestedKg(db: DB, cropId: string): number {
+  return db.harvests.filter((h) => h.cropId === cropId).reduce((s, h) => s + h.quantityKg, 0);
+}
+
+/** Total kg ever sold for a crop, across all sales and grades. */
+export function totalSoldKg(db: DB, cropId: string): number {
+  return db.sales.filter((s) => s.cropId === cropId).reduce((s, x) => s + saleKg(x), 0);
+}
+
+/** Harvested but not yet sold, for a crop. Can go negative if oversold. */
+export function pendingStockKg(db: DB, cropId: string): number {
+  return totalHarvestedKg(db, cropId) - totalSoldKg(db, cropId);
+}
+
 // ---------- Worker commission settings ----------
 
 /**

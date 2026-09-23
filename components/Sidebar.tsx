@@ -18,8 +18,7 @@ const nav = [
 
   { href: "/loans", label: "Borrowings", icon: "◈", group: "Loans" },
 
-  { href: "/harvest-record", label: "Harvest Record", icon: "✳", group: "Income" },
-  { href: "/sales", label: "Sales Record", icon: "◍", group: "Income" },
+  { href: "/income", label: "Harvest & Sales", icon: "✳", group: "Income" },
 
   { href: "/purchases", label: "Purchases", icon: "▨", group: "Expenses" },
   { href: "/payment", label: "Payment", icon: "◑", group: "Expenses" },
