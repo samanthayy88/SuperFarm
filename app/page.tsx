@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { PageHeader, Card, StatCard, Badge, Table, Th, Td, EmptyState } from "@/components/ui";
+import { PageHeader, Card, StatCard, Badge, Table, Th, Td, EmptyState, MonthSelect } from "@/components/ui";
 import BarChart from "@/components/BarChart";
 import {
   fmtRM,
@@ -30,12 +31,14 @@ interface Alert {
 export default function Overview() {
   const { db } = useStore();
   const curMonth = currentMonthKey();
+  const months = lastNMonthKeys(12).reverse();
+  const [month, setMonth] = useState(curMonth);
+  const [asOfYear, asOfMon] = month.split("-").map(Number);
+  const asOfDate = new Date(asOfYear, asOfMon - 1, 1);
 
   // ---- KPIs ----
-  const cutoff = new Date(TODAY);
-  cutoff.setDate(cutoff.getDate() - 30);
-  const sales30 = db.sales.filter((s) => new Date(s.date) >= cutoff);
-  const revenue30 = sales30.reduce((sum, s) => sum + saleTotal(s), 0);
+  const monthSales = db.sales.filter((s) => s.date.startsWith(month));
+  const monthRevenue = monthSales.reduce((sum, s) => sum + saleTotal(s), 0);
   const pendingSales = db.sales.filter((s) => s.paymentStatus === "Pending");
   const receivables = pendingSales.reduce((sum, s) => sum + saleTotal(s), 0);
   const monthlyCommitments =
@@ -89,14 +92,14 @@ export default function Overview() {
   const toneRank = { critical: 0, serious: 1, warning: 2 };
   alerts.sort((a, b) => toneRank[a.tone] - toneRank[b.tone]);
 
-  // ---- Sales chart (last 6 months) ----
-  const months = lastNMonthKeys(6);
-  const chartData = months.map((m) => {
-    const monthSales = db.sales.filter((s) => s.date.startsWith(m));
+  // ---- Sales chart (6 months ending at the selected month) ----
+  const chartMonths = lastNMonthKeys(6, asOfDate);
+  const chartData = chartMonths.map((m) => {
+    const salesInMonth = db.sales.filter((s) => s.date.startsWith(m));
     return {
       label: monthLabel(m).split(" ")[0],
-      value: monthSales.reduce((sum, s) => sum + saleTotal(s), 0),
-      detail: `${monthSales.length} sale(s)`,
+      value: salesInMonth.reduce((sum, s) => sum + saleTotal(s), 0),
+      detail: `${salesInMonth.length} sale(s)`,
     };
   });
 
@@ -109,10 +112,11 @@ export default function Overview() {
       <PageHeader
         title="Overview"
         subtitle={`${TODAY.toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${db.farms.length} farms · ${db.plots.length} plots`}
+        actions={<MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Sales (last 30 days)" value={fmtRM0(revenue30)} sub={`${sales30.length} sales recorded`} />
+        <StatCard label={`Sales — ${monthLabel(month)}`} value={fmtRM0(monthRevenue)} sub={`${monthSales.length} sales recorded`} />
         <StatCard
           label="Outstanding from collectors"
           value={fmtRM0(receivables)}
@@ -145,7 +149,7 @@ export default function Overview() {
         </Card>
 
         <div className="space-y-4">
-          <Card title="Sales revenue — last 6 months">
+          <Card title={`Sales revenue — 6 months ending ${monthLabel(month)}`}>
             <BarChart data={chartData} formatValue={(v) => fmtRM0(v)} />
           </Card>
 

@@ -221,6 +221,29 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={inputClass} />;
 }
 
+/** ClickUp-style pill dropdown for picking a "YYYY-MM" month, e.g. "Sept 2026". */
+export function MonthSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (month: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-sm font-medium text-ink"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
 export function EmptyState({ message }: { message: string }) {
   return <p className="py-8 text-center text-sm text-muted">{message}</p>;
 }

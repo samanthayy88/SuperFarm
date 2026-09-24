@@ -2,17 +2,31 @@
 
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard } from "@/components/ui";
-import { fmtRM0, fmtDate, daysBetween, TODAY } from "@/lib/utils";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, MonthSelect, EmptyState } from "@/components/ui";
+import { fmtRM0, fmtDate, daysBetween, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { SetupProject } from "@/lib/types";
+
+/** Whether a project was active at any point during `month` ("YYYY-MM") — started by
+ *  month's end, and not finished before month's start. */
+function projectActiveInMonth(p: SetupProject, month: string): boolean {
+  const startMonth = p.startDate.slice(0, 7);
+  if (startMonth > month) return false;
+  if (p.actualEndDate && p.actualEndDate.slice(0, 7) < month) return false;
+  return true;
+}
 
 export default function ProjectsPage() {
   const { db, update } = useStore();
   const [showForm, setShowForm] = useState(false);
+  const months = lastNMonthKeys(12).reverse();
+  const [month, setMonth] = useState(
+    () => months.find((m) => db.projects.some((p) => projectActiveInMonth(p, m))) ?? currentMonthKey()
+  );
 
-  const totalQuoted = db.projects.reduce((s, p) => s + p.quotedCharge, 0);
-  const totalPaid = db.projects.reduce((s, p) => s + p.amountPaid, 0);
-  const delayed = db.projects.filter((p) => p.status === "Delayed").length;
+  const monthProjects = db.projects.filter((p) => projectActiveInMonth(p, month));
+  const totalQuoted = monthProjects.reduce((s, p) => s + p.quotedCharge, 0);
+  const totalPaid = monthProjects.reduce((s, p) => s + p.amountPaid, 0);
+  const delayed = monthProjects.filter((p) => p.status === "Delayed").length;
 
   const setStatus = (id: string, status: SetupProject["status"]) => {
     update("projects", (list) =>
@@ -29,17 +43,25 @@ export default function ProjectsPage() {
       <PageHeader
         title="Setup Projects"
         subtitle="Third-party contractor jobs — land clearing, fencing, tilling — charges and progress"
-        actions={<Button onClick={() => setShowForm(true)}>+ Add Project</Button>}
+        actions={
+          <>
+            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+            <Button onClick={() => setShowForm(true)}>+ Add Project</Button>
+          </>
+        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total contractor charges" value={fmtRM0(totalQuoted)} />
+        <StatCard label={`Contractor charges — ${monthLabel(month)}`} value={fmtRM0(totalQuoted)} />
         <StatCard label="Paid to contractors" value={fmtRM0(totalPaid)} />
         <StatCard label="Balance owing" value={fmtRM0(totalQuoted - totalPaid)} tone={totalQuoted - totalPaid > 0 ? "warning" : "good"} />
         <StatCard label="Delayed projects" value={String(delayed)} tone={delayed > 0 ? "critical" : "good"} />
       </div>
 
-      <Card>
+      <Card title={`Projects active — ${monthLabel(month)}`}>
+        {monthProjects.length === 0 ? (
+          <EmptyState message="No projects were active this month." />
+        ) : (
         <Table>
           <thead>
             <tr>
@@ -54,7 +76,7 @@ export default function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {db.projects.map((p) => {
+            {monthProjects.map((p) => {
               const farm = db.farms.find((f) => f.id === p.farmId)?.name ?? "—";
               const overdueDays =
                 p.status !== "Completed" && new Date(p.expectedEndDate) < TODAY
@@ -106,6 +128,7 @@ export default function ProjectsPage() {
             })}
           </tbody>
         </Table>
+        )}
       </Card>
 
       {showForm && <ProjectForm onClose={() => setShowForm(false)} />}

@@ -2,15 +2,27 @@
 
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard, EmptyState, ConfirmDialog } from "@/components/ui";
+import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard, EmptyState, ConfirmDialog, MonthSelect } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, unpaidLoanMonths, loanBalance, currentMonthKey, monthLabel, lastNMonthKeys } from "@/lib/utils";
 import { Loan } from "@/lib/types";
+
+/** Whether `month` ("YYYY-MM") falls within a loan's tenure, counting from its start month. */
+function monthWithinTenure(l: Loan, month: string): boolean {
+  const start = l.startDate.slice(0, 7);
+  if (month < start) return false;
+  const [sy, sm] = start.split("-").map(Number);
+  const [my, mm] = month.split("-").map(Number);
+  const idx = (my - sy) * 12 + (mm - sm);
+  return idx < l.tenureMonths;
+}
 
 export default function LoansPage() {
   const { db, update } = useStore();
   const [loanForm, setLoanForm] = useState<{ mode: "add" } | { mode: "edit"; loan: Loan } | null>(null);
   const [deleteLoan, setDeleteLoan] = useState<Loan | null>(null);
   const curMonth = currentMonthKey();
+  const months = lastNMonthKeys(24).reverse();
+  const [month, setMonth] = useState(curMonth);
 
   const doDeleteLoan = (loan: Loan) => {
     update("loans", (list) => list.filter((l) => l.id !== loan.id));
@@ -19,39 +31,42 @@ export default function LoansPage() {
 
   const totalBorrowed = db.loans.reduce((s, l) => s + l.principal, 0);
   const totalBalance = db.loans.reduce((s, l) => s + loanBalance(l), 0);
-  const totalMonthly = db.loans.reduce((s, l) => s + l.monthlyInstallment, 0);
-  const missedCount = db.loans.reduce((s, l) => s + unpaidLoanMonths(l).filter((m) => m < curMonth).length, 0);
+  const monthlyDue = db.loans.filter((l) => monthWithinTenure(l, month)).reduce((s, l) => s + l.monthlyInstallment, 0);
+  const unpaidCount = db.loans.filter((l) => monthWithinTenure(l, month) && !l.paidMonths.includes(month)).length;
 
-  const togglePaid = (loanId: string, month: string) => {
+  const togglePaid = (loanId: string, m: string) => {
     update("loans", (list) =>
       list.map((l) =>
         l.id === loanId
           ? {
               ...l,
-              paidMonths: l.paidMonths.includes(month)
-                ? l.paidMonths.filter((m) => m !== month)
-                : [...l.paidMonths, month],
+              paidMonths: l.paidMonths.includes(m)
+                ? l.paidMonths.filter((x) => x !== m)
+                : [...l.paidMonths, m],
             }
           : l
       )
     );
   };
 
-  const recentMonths = lastNMonthKeys(6);
-
   return (
     <div>
       <PageHeader
         title="Loans & Repayments"
         subtitle="Bank, relatives and friends — installments, balances and missed payments"
-        actions={<Button onClick={() => setLoanForm({ mode: "add" })}>+ Add Loan</Button>}
+        actions={
+          <>
+            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+            <Button onClick={() => setLoanForm({ mode: "add" })}>+ Add Loan</Button>
+          </>
+        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total borrowed" value={fmtRM0(totalBorrowed)} />
         <StatCard label="Estimated balance" value={fmtRM0(totalBalance)} sub="Principal minus installments paid" />
-        <StatCard label="Total monthly installments" value={fmtRM0(totalMonthly)} />
-        <StatCard label="Missed installments" value={String(missedCount)} tone={missedCount > 0 ? "critical" : "good"} />
+        <StatCard label={`Installments due — ${monthLabel(month)}`} value={fmtRM0(monthlyDue)} />
+        <StatCard label={`Unpaid — ${monthLabel(month)}`} value={String(unpaidCount)} tone={unpaidCount > 0 ? "critical" : "good"} />
       </div>
 
       <div className="space-y-4">
@@ -99,34 +114,32 @@ export default function LoansPage() {
                 </p>
               )}
 
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Installments — last 6 months (click to mark paid/unpaid)</p>
-              <div className="flex flex-wrap gap-2">
-                {recentMonths.map((m) => {
-                  const start = l.startDate.slice(0, 7);
-                  if (m < start)
-                    return (
-                      <span key={m} className="rounded border border-hairline px-3 py-1.5 text-xs text-muted/50">
-                        {monthLabel(m)} — n/a
-                      </span>
-                    );
-                  const paid = l.paidMonths.includes(m);
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Installment — {monthLabel(month)} (click to mark paid/unpaid)</p>
+              {!monthWithinTenure(l, month) ? (
+                <span className="inline-block rounded border border-hairline px-3 py-1.5 text-xs text-muted/50">
+                  {month < l.startDate.slice(0, 7) ? "Loan hadn't started yet" : "Loan tenure already ended"}
+                </span>
+              ) : (
+                (() => {
+                  const paid = l.paidMonths.includes(month);
                   return (
                     <button
-                      key={m}
-                      onClick={() => togglePaid(l.id, m)}
+                      onClick={() => togglePaid(l.id, month)}
                       className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
                         paid
                           ? "border-good/40 bg-good/10 text-good"
-                          : m === curMonth
+                          : month === curMonth
                             ? "border-warning/40 bg-warning/10 text-warning"
-                            : "border-critical/40 bg-critical/10 text-critical"
+                            : month > curMonth
+                              ? "border-hairline bg-surface-2 text-ink-2"
+                              : "border-critical/40 bg-critical/10 text-critical"
                       }`}
                     >
-                      {monthLabel(m)} — {paid ? "Paid ✓" : m === curMonth ? "Due" : "MISSED"}
+                      {monthLabel(month)} — {paid ? "Paid ✓" : month === curMonth ? "Due" : month > curMonth ? "Upcoming" : "MISSED"}
                     </button>
                   );
-                })}
-              </div>
+                })()
+              )}
             </Card>
           );
         })}

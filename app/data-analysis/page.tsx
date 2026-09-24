@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { PageHeader, Card, Table, Th, Td, StatCard, Tabs, EmptyState, Badge } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, StatCard, Tabs, EmptyState, Badge, MonthSelect } from "@/components/ui";
 import {
   fmtRM,
   fmtRM0,
-  monthKey,
   monthLabel,
   lastNMonthKeys,
   currentMonthKey,
@@ -15,30 +14,46 @@ import {
   applicationCost,
   computePayroll,
   averageCycleDaysByCrop,
-  TODAY,
 } from "@/lib/utils";
 import BarChart from "@/components/BarChart";
 import GroupedBarChart from "@/components/GroupedBarChart";
 
+/** "YYYY-MM" → the 1st of that month, for feeding lastNMonthKeys' `from`. */
+function monthToDate(month: string): Date {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(y, m - 1, 1);
+}
+
 export default function DataAnalysisPage() {
+  const { db } = useStore();
   const [tab, setTab] = useState("Farm Analysis");
+  const months = lastNMonthKeys(12).reverse();
+  const [month, setMonth] = useState(
+    () => months.find((m) => db.harvests.some((h) => h.date.startsWith(m)) || db.sales.some((s) => s.date.startsWith(m))) ?? currentMonthKey()
+  );
 
   return (
     <div>
       <PageHeader
         title="Data & Analysis"
         subtitle="Cross-farm, financial, worker and application-cost analytics, rolled up from every record in the dashboard"
+        actions={
+          tab !== "Farm Analysis" ? (
+            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+          ) : undefined
+        }
       />
       <Tabs tabs={["Farm Analysis", "Financial Analysis", "Worker Analysis", "Application Analysis"]} active={tab} onChange={setTab} />
       {tab === "Farm Analysis" && <FarmAnalysis />}
-      {tab === "Financial Analysis" && <FinancialAnalysis />}
-      {tab === "Worker Analysis" && <WorkerAnalysis />}
-      {tab === "Application Analysis" && <ApplicationAnalysis />}
+      {tab === "Financial Analysis" && <FinancialAnalysis month={month} />}
+      {tab === "Worker Analysis" && <WorkerAnalysis month={month} />}
+      {tab === "Application Analysis" && <ApplicationAnalysis month={month} />}
     </div>
   );
 }
 
 /* ------------------------------- Farm Analysis ------------------------------- */
+/* Plot/cycle configuration, not a monthly transaction — not scoped to the month filter. */
 
 function FarmAnalysis() {
   const { db } = useStore();
@@ -104,10 +119,9 @@ function FarmAnalysis() {
 
 /* ----------------------------- Financial Analysis ----------------------------- */
 
-function FinancialAnalysis() {
+function FinancialAnalysis({ month }: { month: string }) {
   const { db } = useStore();
-  const months = lastNMonthKeys(6);
-  const month = months[months.length - 1];
+  const months = lastNMonthKeys(6, monthToDate(month));
 
   const salaryForMonth = (m: string) => {
     const payroll = computePayroll(db, m);
@@ -139,16 +153,16 @@ function FinancialAnalysis() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Income — last 6 months" value={fmtRM0(totalIncome6mo)} />
-        <StatCard label="Expenses — last 6 months" value={fmtRM0(totalExpense6mo)} />
+        <StatCard label={`Income — 6 months ending ${monthLabel(month)}`} value={fmtRM0(totalIncome6mo)} />
+        <StatCard label={`Expenses — 6 months ending ${monthLabel(month)}`} value={fmtRM0(totalExpense6mo)} />
         <StatCard
-          label="Net — last 6 months"
+          label="Net — same period"
           value={fmtRM0(totalIncome6mo - totalExpense6mo)}
           tone={totalIncome6mo - totalExpense6mo >= 0 ? "good" : "critical"}
         />
       </div>
 
-      <Card title="Income vs expenses, last 6 months">
+      <Card title={`Income vs expenses, 6 months ending ${monthLabel(month)}`}>
         <GroupedBarChart data={chartData} seriesNames={["Income", "Expenses"]} formatValue={fmtRM} />
       </Card>
 
@@ -180,12 +194,8 @@ function FinancialAnalysis() {
 
 /* ------------------------------- Worker Analysis ------------------------------- */
 
-function WorkerAnalysis() {
+function WorkerAnalysis({ month }: { month: string }) {
   const { db } = useStore();
-  const months = lastNMonthKeys(6).reverse();
-  const [month, setMonth] = useState(
-    () => months.find((m) => db.harvests.some((h) => h.date.startsWith(m))) ?? currentMonthKey()
-  );
   const payroll = computePayroll(db, month);
   const totalKg = db.harvests.filter((h) => h.date.startsWith(month)).reduce((s, h) => s + h.quantityKg, 0);
   const totalCommission = payroll.reduce((s, p) => s + p.commissionTotal, 0);
@@ -198,18 +208,6 @@ function WorkerAnalysis() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <select
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className="rounded border border-hairline bg-surface-2 px-3 py-2 text-sm text-ink"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>{monthLabel(m)}</option>
-          ))}
-        </select>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total kg harvested" value={totalKg.toLocaleString()} />
         <StatCard label="Total commission paid" value={fmtRM0(totalCommission)} />
@@ -259,34 +257,34 @@ function WorkerAnalysis() {
 
 /* ----------------------------- Application Analysis ----------------------------- */
 
-function ApplicationAnalysis() {
+function ApplicationAnalysis({ month }: { month: string }) {
   const { db } = useStore();
-  const totalCost = db.applications.reduce((s, a) => s + applicationCost(a), 0);
-  const avgCost = db.applications.length ? totalCost / db.applications.length : 0;
-  const thisMonth = monthKey(TODAY);
-  const monthCost = db.applications.filter((a) => a.date.startsWith(thisMonth)).reduce((s, a) => s + applicationCost(a), 0);
+  const rounds = db.applications.filter((a) => a.date.startsWith(month));
+  const totalCost = rounds.reduce((s, a) => s + applicationCost(a), 0);
+  const avgCost = rounds.length ? totalCost / rounds.length : 0;
+  const totalWater = rounds.reduce((s, a) => s + a.waterVolumeL, 0);
 
   const targets = ["Pest", "Disease", "Weed", "Foliar Feed", "Mixed"] as const;
-  const targetData = targets.map((t) => ({ label: t, value: db.applications.filter((a) => a.target === t).length }));
+  const targetData = targets.map((t) => ({ label: t, value: rounds.filter((a) => a.target === t).length }));
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Rounds recorded" value={String(db.applications.length)} />
+        <StatCard label={`Rounds — ${monthLabel(month)}`} value={String(rounds.length)} />
         <StatCard label="Total input cost" value={fmtRM0(totalCost)} />
         <StatCard label="Average cost / round" value={fmtRM(avgCost)} />
-        <StatCard label={`This month (${monthLabel(thisMonth)})`} value={fmtRM0(monthCost)} />
+        <StatCard label="Water applied" value={`${totalWater.toLocaleString()} L`} />
       </div>
 
-      <Card title="Application rounds by target">
-        {db.applications.length === 0 ? (
-          <EmptyState message="No applications recorded yet." />
+      <Card title={`Application rounds by target — ${monthLabel(month)}`}>
+        {rounds.length === 0 ? (
+          <EmptyState message="No applications recorded for this month." />
         ) : (
           <BarChart data={targetData} formatValue={(v) => `${v} round(s)`} />
         )}
       </Card>
 
-      <Card title="Input cost by farm">
+      <Card title={`Input cost by farm — ${monthLabel(month)}`}>
         <Table>
           <thead>
             <tr>
@@ -298,15 +296,15 @@ function ApplicationAnalysis() {
           </thead>
           <tbody>
             {db.farms.map((f) => {
-              const rounds = db.applications.filter((a) => a.farmId === f.id);
-              const cost = rounds.reduce((s, a) => s + applicationCost(a), 0);
+              const farmRounds = rounds.filter((a) => a.farmId === f.id);
+              const cost = farmRounds.reduce((s, a) => s + applicationCost(a), 0);
               const counts = new Map<string, number>();
-              for (const a of rounds) counts.set(a.target, (counts.get(a.target) ?? 0) + 1);
+              for (const a of farmRounds) counts.set(a.target, (counts.get(a.target) ?? 0) + 1);
               const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
               return (
                 <tr key={f.id}>
                   <Td className="font-medium">{f.name}</Td>
-                  <Td right>{rounds.length}</Td>
+                  <Td right>{farmRounds.length}</Td>
                   <Td right>{fmtRM(cost)}</Td>
                   <Td>{top ? <Badge tone="accent">{top[0]}</Badge> : "—"}</Td>
                 </tr>

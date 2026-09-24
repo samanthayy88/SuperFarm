@@ -2,20 +2,26 @@
 
 import { useState, useRef } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, purchaseTotal, TODAY } from "@/lib/utils";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, MonthSelect, EmptyState } from "@/components/ui";
+import { fmtRM, fmtRM0, fmtDate, purchaseTotal, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { Purchase, PurchaseLine } from "@/lib/types";
 
 export default function PurchasesPage() {
   const { db, update } = useStore();
   const [showPurchase, setShowPurchase] = useState(false);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const months = lastNMonthKeys(12).reverse();
+  const [month, setMonth] = useState(
+    () => months.find((m) => db.purchases.some((p) => p.date.startsWith(m))) ?? currentMonthKey()
+  );
 
   const claims = db.purchases.filter((p) => p.paidBy === "Own Pocket");
   const toClaim = claims.filter((p) => p.claimStatus === "To Claim");
   const claimPending = claims.filter((p) => p.claimStatus !== "Reimbursed");
   const claimPendingTotal = claimPending.reduce((s, p) => s + purchaseTotal(p), 0);
   const totalSpend = db.purchases.reduce((s, p) => s + purchaseTotal(p), 0);
+  const monthPurchases = db.purchases.filter((p) => p.date.startsWith(month));
+  const monthVendors = new Set(monthPurchases.map((p) => p.supplierId)).size;
 
   const setClaimStatus = (id: string, status: Purchase["claimStatus"]) =>
     update("purchases", (list) => list.map((p) => (p.id === id ? { ...p, claimStatus: status } : p)));
@@ -25,17 +31,25 @@ export default function PurchasesPage() {
       <PageHeader
         title="Purchases"
         subtitle="Upload receipts, link them to stock items and claim personal spend"
-        actions={<Button onClick={() => setShowPurchase(true)}>+ New Purchase / Receipt</Button>}
+        actions={
+          <>
+            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+            <Button onClick={() => setShowPurchase(true)}>+ New Purchase / Receipt</Button>
+          </>
+        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total purchases" value={fmtRM0(totalSpend)} sub={`${db.purchases.length} record(s)`} />
+        <StatCard label={`Purchases — ${monthLabel(month)}`} value={fmtRM0(monthPurchases.reduce((s, p) => s + purchaseTotal(p), 0))} sub={`${monthPurchases.length} record(s)`} />
         <StatCard label="Claims outstanding" value={fmtRM0(claimPendingTotal)} sub={`${toClaim.length} not yet submitted`} tone={claimPendingTotal > 0 ? "warning" : "good"} />
-        <StatCard label="Vendors used" value={String(db.suppliers.length)} />
-        <StatCard label="This month" value={fmtRM0(db.purchases.filter((p) => p.date.startsWith(TODAY.toISOString().slice(0, 7))).reduce((s, p) => s + purchaseTotal(p), 0))} />
+        <StatCard label={`Vendors used — ${monthLabel(month)}`} value={String(monthVendors)} />
+        <StatCard label="All-time purchases" value={fmtRM0(totalSpend)} sub={`${db.purchases.length} record(s)`} />
       </div>
 
-      <Card title="All purchases">
+      <Card title={`Purchases — ${monthLabel(month)}`}>
+        {monthPurchases.length === 0 ? (
+          <EmptyState message="No purchases recorded for this month." />
+        ) : (
         <Table>
           <thead>
             <tr>
@@ -49,7 +63,7 @@ export default function PurchasesPage() {
             </tr>
           </thead>
           <tbody>
-            {[...db.purchases].sort((a, b) => b.date.localeCompare(a.date)).map((p) => {
+            {[...monthPurchases].sort((a, b) => b.date.localeCompare(a.date)).map((p) => {
               const sup = db.suppliers.find((s) => s.id === p.supplierId);
               return (
                 <tr key={p.id}>
@@ -107,6 +121,7 @@ export default function PurchasesPage() {
             })}
           </tbody>
         </Table>
+        )}
       </Card>
 
       {showPurchase && <PurchaseForm onClose={() => setShowPurchase(false)} />}

@@ -2,35 +2,45 @@
 
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, applicationCost, TODAY } from "@/lib/utils";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
+import { fmtRM, fmtRM0, fmtDate, applicationCost, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { ApplicationRecord, ApplicationProduct } from "@/lib/types";
 
 export default function ApplicationsPage() {
   const { db } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState("Application Rounds");
+  const months = lastNMonthKeys(12).reverse();
+  const [month, setMonth] = useState(
+    () => months.find((m) => db.applications.some((a) => a.date.startsWith(m))) ?? currentMonthKey()
+  );
 
-  const totalCost = db.applications.reduce((s, a) => s + applicationCost(a), 0);
-  const avgCost = db.applications.length ? totalCost / db.applications.length : 0;
-  const totalWater = db.applications.reduce((s, a) => s + a.waterVolumeL, 0);
+  const rounds = db.applications.filter((a) => a.date.startsWith(month));
+  const totalCost = rounds.reduce((s, a) => s + applicationCost(a), 0);
+  const avgCost = rounds.length ? totalCost / rounds.length : 0;
+  const totalWater = rounds.reduce((s, a) => s + a.waterVolumeL, 0);
 
   return (
     <div>
       <PageHeader
-        title="Spray Applications"
+        title="Agri Inputs"
         subtitle="Cost per application round — products, dose rates and water volume, per plot"
-        actions={<Button onClick={() => setShowForm(true)}>+ Record Application</Button>}
+        actions={
+          <>
+            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+            <Button onClick={() => setShowForm(true)}>+ Record Application</Button>
+          </>
+        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total application cost" value={fmtRM0(totalCost)} sub={`${db.applications.length} rounds recorded`} />
+        <StatCard label={`Application cost — ${monthLabel(month)}`} value={fmtRM0(totalCost)} sub={`${rounds.length} rounds recorded`} />
         <StatCard label="Average cost per round" value={fmtRM(avgCost)} />
         <StatCard label="Total water applied" value={`${totalWater.toLocaleString()} L`} />
         <StatCard
           label="Average cost per 100L"
           value={totalWater ? fmtRM((totalCost / totalWater) * 100) : "—"}
-          sub="Blended across all rounds"
+          sub="Blended across this month's rounds"
         />
       </div>
 
@@ -38,10 +48,10 @@ export default function ApplicationsPage() {
 
       {tab === "Application Rounds" && (
         <div className="space-y-4">
-          {db.applications.length === 0 ? (
-            <Card><EmptyState message="No applications recorded yet." /></Card>
+          {rounds.length === 0 ? (
+            <Card><EmptyState message="No applications recorded for this month." /></Card>
           ) : (
-            [...db.applications].sort((a, b) => b.date.localeCompare(a.date)).map((a) => {
+            [...rounds].sort((a, b) => b.date.localeCompare(a.date)).map((a) => {
               const farm = db.farms.find((f) => f.id === a.farmId);
               const plot = db.plots.find((p) => p.id === a.plotId);
               const crop = db.crops.find((c) => c.id === plot?.cropId);
@@ -107,7 +117,7 @@ export default function ApplicationsPage() {
       )}
 
       {tab === "By Plot" && (
-        <Card title="Agri-input cost by plot">
+        <Card title={`Agri-input cost by plot — ${monthLabel(month)}`}>
           <Table>
             <thead>
               <tr>
@@ -122,7 +132,7 @@ export default function ApplicationsPage() {
             </thead>
             <tbody>
               {db.plots.map((plot) => {
-                const apps = db.applications.filter((a) => a.plotId === plot.id);
+                const apps = rounds.filter((a) => a.plotId === plot.id);
                 if (apps.length === 0) return null;
                 const cost = apps.reduce((s, a) => s + applicationCost(a), 0);
                 return (
@@ -145,7 +155,7 @@ export default function ApplicationsPage() {
       )}
 
       {tab === "Product Usage" && (
-        <Card title="Agri-input usage across all rounds">
+        <Card title={`Agri-input usage — ${monthLabel(month)}`}>
           <Table>
             <thead>
               <tr>
@@ -159,7 +169,7 @@ export default function ApplicationsPage() {
             </thead>
             <tbody>
               {db.items.map((item) => {
-                const uses = db.applications.flatMap((a) => a.products.filter((p) => p.itemId === item.id));
+                const uses = rounds.flatMap((a) => a.products.filter((p) => p.itemId === item.id));
                 if (uses.length === 0) return null;
                 const qty = uses.reduce((s, p) => s + p.quantityUsed, 0);
                 const cost = uses.reduce((s, p) => s + p.quantityUsed * p.unitCost, 0);

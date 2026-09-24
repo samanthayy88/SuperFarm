@@ -2,30 +2,40 @@
 
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState } from "@/components/ui";
-import { fmtRM, fmtDate, TODAY } from "@/lib/utils";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
+import { fmtRM, fmtDate, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { UsageLog } from "@/lib/types";
 
 export default function InventoryPage() {
   const { db, update } = useStore();
   const [tab, setTab] = useState("Inventory");
   const [showUsage, setShowUsage] = useState(false);
+  const months = lastNMonthKeys(12).reverse();
+  const [month, setMonth] = useState(
+    () => months.find((m) => db.usageLogs.some((u) => u.date.startsWith(m))) ?? currentMonthKey()
+  );
 
   const lowStock = db.items.filter((i) => i.trackInventory && i.stock <= i.minStock);
   const stockValue = db.items.reduce((s, i) => s + i.stock * i.lastCostPerUnit, 0);
+  const monthUsage = db.usageLogs.filter((u) => u.date.startsWith(month));
 
   return (
     <div>
       <PageHeader
         title="Stock Level"
-        subtitle="Track quantity on hand, supplier invoice names and usage — purchases update stock automatically"
-        actions={<Button variant="ghost" onClick={() => setShowUsage(true)}>− Record Usage</Button>}
+        subtitle="Track quantity on hand, supplier invoice names and usage — purchases update stock automatically. The month filter applies to the Usage Log."
+        actions={
+          <>
+            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+            <Button variant="ghost" onClick={() => setShowUsage(true)}>− Record Usage</Button>
+          </>
+        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Stock value" value={fmtRM(stockValue)} sub={`${db.items.length} tracked items`} />
         <StatCard label="Items low / out of stock" value={String(lowStock.length)} tone={lowStock.length > 0 ? "critical" : "good"} />
-        <StatCard label="Usage logged" value={String(db.usageLogs.length)} />
+        <StatCard label={`Usage logged — ${monthLabel(month)}`} value={String(monthUsage.length)} />
         <StatCard label="Vendors" value={String(db.suppliers.length)} />
       </div>
 
@@ -130,9 +140,9 @@ export default function InventoryPage() {
       )}
 
       {tab === "Usage Log" && (
-        <Card title="Stock usage log">
-          {db.usageLogs.length === 0 ? (
-            <EmptyState message="No usage recorded yet." />
+        <Card title={`Stock usage log — ${monthLabel(month)}`}>
+          {monthUsage.length === 0 ? (
+            <EmptyState message="No usage recorded for this month." />
           ) : (
             <Table>
               <thead>
@@ -145,7 +155,7 @@ export default function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {[...db.usageLogs].sort((a, b) => b.date.localeCompare(a.date)).map((u) => {
+                {[...monthUsage].sort((a, b) => b.date.localeCompare(a.date)).map((u) => {
                   const item = db.items.find((i) => i.id === u.itemId);
                   return (
                     <tr key={u.id}>
