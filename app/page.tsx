@@ -12,6 +12,7 @@ import {
   saleTotal,
   saleOverdueDays,
   contractStatus,
+  isRenewed,
   unpaidRentMonths,
   unpaidLoanMonths,
   currentMonthKey,
@@ -51,7 +52,9 @@ export default function Overview() {
   for (const c of db.contracts) {
     const farm = db.farms.find((f) => f.id === c.farmId)?.name ?? "?";
     const st = contractStatus(c);
-    if (st === "Expired")
+    if (isRenewed(c, db.contracts)) {
+      // already renewed: no expiry reminder, but any rent still owed from that term stays flagged
+    } else if (st === "Expired")
       alerts.push({ tone: "critical", tag: "Contract", text: `${farm}: rental contract EXPIRED on ${fmtDate(c.endDate)} — renew with ${c.landlord}`, href: "/contracts" });
     else if (st === "Expiring Soon")
       alerts.push({ tone: "warning", tag: "Contract", text: `${farm}: contract expires ${fmtDate(c.endDate)} (${daysBetween(TODAY, new Date(c.endDate))} days left)`, href: "/contracts" });

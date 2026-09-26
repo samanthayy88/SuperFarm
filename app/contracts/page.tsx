@@ -2,15 +2,42 @@
 
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, contractStatus, unpaidRentMonths, currentMonthKey, monthLabel, lastNMonthKeys, daysBetween, TODAY } from "@/lib/utils";
+import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard, Table, Th, Td } from "@/components/ui";
+import {
+  fmtRM,
+  fmtRM0,
+  fmtDate,
+  contractStatus,
+  unpaidRentMonths,
+  currentMonthKey,
+  monthLabel,
+  lastNMonthKeys,
+  daysBetween,
+  isRenewed,
+  rentalTenure,
+  fmtDuration,
+  TODAY,
+} from "@/lib/utils";
 import { RentalContract } from "@/lib/types";
+
+/** ISO date string shifted by whole days/years, done in UTC so timezones can't move it. */
+function shiftISO(iso: string, { days = 0, years = 0 }: { days?: number; years?: number }): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y + years, m - 1, d + days)).toISOString().slice(0, 10);
+}
 
 export default function ContractsPage() {
   const { db, update } = useStore();
   const [showForm, setShowForm] = useState(false);
+  const [renewing, setRenewing] = useState<RentalContract | null>(null);
+  const [recordFarmId, setRecordFarmId] = useState<string | null>(null);
   const curMonth = currentMonthKey();
 
+  // a renewed term is history; only the current term per farm needs attention
+  const farmOrder = (c: RentalContract) => db.farms.findIndex((f) => f.id === c.farmId);
+  const currentContracts = db.contracts
+    .filter((c) => !isRenewed(c, db.contracts))
+    .sort((a, b) => farmOrder(a) - farmOrder(b));
   const totalMonthlyRent = db.contracts
     .filter((c) => contractStatus(c) !== "Expired")
     .reduce((s, c) => s + c.monthlyRent, 0);
@@ -18,7 +45,7 @@ export default function ContractsPage() {
     (s, c) => s + unpaidRentMonths(c).filter((m) => m < curMonth).length * c.monthlyRent,
     0
   );
-  const expiringCount = db.contracts.filter((c) => contractStatus(c) !== "Active").length;
+  const expiringCount = currentContracts.filter((c) => contractStatus(c) !== "Active").length;
 
   const togglePaid = (contractId: string, month: string) => {
     update("contracts", (list) =>
@@ -52,13 +79,30 @@ export default function ContractsPage() {
       </div>
 
       <div className="space-y-4">
-        {db.contracts.map((c) => {
+        {currentContracts.map((c) => {
           const farm = db.farms.find((f) => f.id === c.farmId);
           const st = contractStatus(c);
           const missed = unpaidRentMonths(c).filter((m) => m < curMonth);
           const end = new Date(c.endDate);
+          const farmTerms = db.contracts.filter((x) => x.farmId === c.farmId);
+          const tenure = rentalTenure(farmTerms);
           return (
-            <Card key={c.id} title={`${farm?.name ?? "Unknown farm"} — ${c.landlord}`}>
+            <Card
+              key={c.id}
+              title={`${farm?.name ?? "Unknown farm"} — ${c.landlord}`}
+              actions={
+                <div className="flex gap-2">
+                  <Button small variant="ghost" onClick={() => setRecordFarmId(c.farmId)}>
+                    Rental record
+                  </Button>
+                  {st === "Expired" && (
+                    <Button small onClick={() => setRenewing(c)}>
+                      Renew
+                    </Button>
+                  )}
+                </div>
+              }
+            >
               <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                 <Badge tone={st === "Active" ? "good" : st === "Expiring Soon" ? "warning" : "critical"}>
                   {st === "Expiring Soon" ? `Expires in ${daysBetween(TODAY, end)} days` : st}
@@ -72,6 +116,12 @@ export default function ContractsPage() {
                 <span className="text-ink-2">
                   <span className="text-muted">Deposit:</span> {fmtRM0(c.depositPaid)}
                 </span>
+                {tenure && (
+                  <span className="text-ink-2">
+                    <span className="text-muted">Renting since:</span> {fmtDate(tenure.since)} · {fmtDuration(tenure.days)}
+                    {farmTerms.length > 1 && <span className="text-muted"> ({farmTerms.length} terms)</span>}
+                  </span>
+                )}
                 {c.notes && <span className="text-muted italic">{c.notes}</span>}
               </div>
 
@@ -115,7 +165,141 @@ export default function ContractsPage() {
       </div>
 
       {showForm && <ContractForm onClose={() => setShowForm(false)} />}
+      {renewing && <RenewForm previous={renewing} onClose={() => setRenewing(null)} />}
+      {recordFarmId && <RentalRecordModal farmId={recordFarmId} onClose={() => setRecordFarmId(null)} />}
     </div>
+  );
+}
+
+function RenewForm({ previous, onClose }: { previous: RentalContract; onClose: () => void }) {
+  const { db, update } = useStore();
+  const farm = db.farms.find((f) => f.id === previous.farmId);
+  const start = shiftISO(previous.endDate, { days: 1 });
+  const [form, setForm] = useState({
+    landlord: previous.landlord,
+    monthlyRent: String(previous.monthlyRent),
+    startDate: start,
+    endDate: shiftISO(start, { years: 1, days: -1 }),
+    depositPaid: String(previous.depositPaid),
+    notes: "",
+  });
+
+  const invalid = !form.landlord.trim() || !form.startDate || !form.endDate || form.endDate <= form.startDate;
+
+  const submit = () => {
+    if (invalid) return;
+    const c: RentalContract = {
+      id: newId("ct"),
+      farmId: previous.farmId,
+      landlord: form.landlord.trim(),
+      monthlyRent: Number(form.monthlyRent) || 0,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      depositPaid: Number(form.depositPaid) || 0,
+      notes: form.notes.trim() || undefined,
+      paidMonths: [],
+    };
+    update("contracts", (list) => [...list, c]);
+    onClose();
+  };
+
+  return (
+    <Modal title={`Renew — ${farm?.name ?? "Unknown farm"}`} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="rounded border border-hairline bg-surface-2 px-3 py-2 text-xs text-muted">
+          The expired term ({fmtDate(previous.startDate)} → {fmtDate(previous.endDate)}) is kept in this farm&apos;s Rental record.
+          Dates below start the day after it ended — change them if the new term began later.
+        </p>
+        <Field label="Landlord">
+          <TextInput value={form.landlord} onChange={(e) => setForm({ ...form, landlord: e.target.value })} />
+        </Field>
+        <Field label="Monthly rent (RM)">
+          <TextInput type="number" value={form.monthlyRent} onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="New start date">
+            <TextInput type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+          </Field>
+          <Field label="New end date">
+            <TextInput type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+          </Field>
+        </div>
+        {form.endDate && form.startDate && form.endDate <= form.startDate && (
+          <p className="text-xs text-critical">End date must be after the start date.</p>
+        )}
+        <Field label="Deposit (RM)">
+          <TextInput type="number" value={form.depositPaid} onChange={(e) => setForm({ ...form, depositPaid: e.target.value })} />
+        </Field>
+        <Field label="Notes">
+          <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit}>Renew contract</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function RentalRecordModal({ farmId, onClose }: { farmId: string; onClose: () => void }) {
+  const { db } = useStore();
+  const farm = db.farms.find((f) => f.id === farmId);
+  const terms = db.contracts.filter((c) => c.farmId === farmId).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const tenure = rentalTenure(terms);
+  const totalPaid = terms.reduce((s, c) => s + c.paidMonths.length * c.monthlyRent, 0);
+  const curMonth = currentMonthKey();
+
+  return (
+    <Modal title={`Rental record — ${farm?.name ?? "Unknown farm"}`} onClose={onClose} wide>
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label="Renting since" value={tenure ? fmtDate(tenure.since) : "Not started"} />
+        <StatCard label="Total time rented" value={tenure ? fmtDuration(tenure.days) : "—"} sub="Overlapping terms counted once" />
+        <StatCard label="Rent paid to date" value={fmtRM0(totalPaid)} sub={`${terms.length} term${terms.length === 1 ? "" : "s"}`} />
+      </div>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Term</Th>
+            <Th>Landlord</Th>
+            <Th>Period</Th>
+            <Th right>Length</Th>
+            <Th right>Rent / month</Th>
+            <Th right>Deposit</Th>
+            <Th>Status</Th>
+            <Th>Rent unpaid</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {terms.map((c, i) => {
+            const st = contractStatus(c);
+            const missed = unpaidRentMonths(c).filter((m) => m < curMonth);
+            const days = daysBetween(c.startDate, c.endDate) + 1;
+            return (
+              <tr key={c.id}>
+                <Td className="font-medium">#{i + 1}</Td>
+                <Td>{c.landlord}</Td>
+                <Td>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</Td>
+                <Td right>{fmtDuration(days)}</Td>
+                <Td right>{fmtRM(c.monthlyRent)}</Td>
+                <Td right>{fmtRM0(c.depositPaid)}</Td>
+                <Td>
+                  <Badge tone={st === "Active" ? "good" : st === "Expiring Soon" ? "warning" : "neutral"}>
+                    {st === "Expired" && i < terms.length - 1 ? "Renewed" : st}
+                  </Badge>
+                </Td>
+                <Td className={missed.length > 0 ? "text-critical" : ""}>
+                  {missed.length > 0 ? missed.map(monthLabel).join(", ") : "—"}
+                </Td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Table>
+      <div className="mt-4 flex justify-end">
+        <Button variant="ghost" onClick={onClose}>Close</Button>
+      </div>
+    </Modal>
   );
 }
 

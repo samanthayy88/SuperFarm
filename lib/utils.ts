@@ -80,6 +80,47 @@ export function unpaidRentMonths(c: RentalContract): string[] {
   return out;
 }
 
+/** An expired term that a later term on the same farm has replaced, i.e. it was renewed. */
+export function isRenewed(c: RentalContract, all: RentalContract[]): boolean {
+  return contractStatus(c) === "Expired" && all.some((o) => o.farmId === c.farmId && o.startDate > c.startDate);
+}
+
+/** The most recent term on a farm. */
+export function latestContractForFarm(all: RentalContract[], farmId: string): RentalContract | undefined {
+  return all.filter((c) => c.farmId === farmId).sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+}
+
+/**
+ * How long a farm has been rented so far: days across every term up to today,
+ * with overlapping terms merged so the same day is never counted twice.
+ * Null when no term has started yet.
+ */
+export function rentalTenure(contracts: RentalContract[]): { since: string; days: number } | null {
+  const todayISO = TODAY.toISOString().slice(0, 10);
+  const spans = contracts
+    .map((c) => ({ s: c.startDate, e: c.endDate < todayISO ? c.endDate : todayISO }))
+    .filter((x) => x.s <= x.e)
+    .sort((a, b) => a.s.localeCompare(b.s));
+  if (spans.length === 0) return null;
+  const merged = [spans[0]];
+  for (const x of spans.slice(1)) {
+    const last = merged[merged.length - 1];
+    if (x.s <= last.e) last.e = x.e > last.e ? x.e : last.e;
+    else merged.push({ ...x });
+  }
+  return { since: merged[0].s, days: merged.reduce((sum, x) => sum + daysBetween(x.s, x.e) + 1, 0) };
+}
+
+/** 999 days → "2 yrs 8 mos". */
+export function fmtDuration(days: number): string {
+  // 0.1 month (~3 days) of slack so a term ending on a month's last day isn't rounded down a month
+  const months = Math.floor(days / 30.4375 + 0.1);
+  if (months < 1) return `${days} day${days === 1 ? "" : "s"}`;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return [y ? `${y} yr${y === 1 ? "" : "s"}` : "", m ? `${m} mo${m === 1 ? "" : "s"}` : ""].filter(Boolean).join(" ");
+}
+
 // ---------- Loans ----------
 export function loanMonthsElapsed(l: Loan): string[] {
   const start = new Date(l.startDate);

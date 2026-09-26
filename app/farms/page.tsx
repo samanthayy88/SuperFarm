@@ -26,6 +26,7 @@ import {
   currentStage,
   nextStage,
   averageCycleDaysByCrop,
+  latestContractForFarm,
 } from "@/lib/utils";
 import { Farm, Plot, PlotCycle, PlotCycleRecord, PLOT_STAGES, PLOT_STAGE_LABELS } from "@/lib/types";
 import VarietySelect from "@/components/VarietySelect";
@@ -174,7 +175,7 @@ export default function FarmsPage() {
 
         {db.farms.map((farm) => {
           const plots = db.plots.filter((p) => p.farmId === farm.id);
-          const contract = db.contracts.find((c) => c.farmId === farm.id);
+          const contract = latestContractForFarm(db.contracts, farm.id);
           return (
             <Card
               key={farm.id}
