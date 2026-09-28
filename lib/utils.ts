@@ -229,21 +229,19 @@ export function pendingStockKg(db: DB, cropId: string): number {
 // ---------- Worker commission settings ----------
 
 /**
- * Effective RM/kg for one worker's harvest on a given plot+crop(+variety).
- * Prefers a worker-level WorkerCommissionSetting matching the exact variety,
- * then one set for "any variety" on that plot, before falling back to the
- * crop's global `commissionRatePerKg`.
+ * The rate a worker's Commission Setting currently gives for a crop(+variety)
+ * — wherever they harvest it, since a plot's crop rotates over time. Prefers
+ * an exact variety match, then one set for "any variety" of the crop, before
+ * falling back to the crop's global `commissionRatePerKg`.
+ *
+ * This reflects *today's* settings — used only to suggest a rate when
+ * recording a new harvest (or "Use current rate" when editing one). Once a
+ * harvest is saved, its own `commissionRate` is what counts; this function
+ * is never consulted again for past harvests, so a later change here can't
+ * rewrite commission, payroll or payslip history.
  */
-export function commissionRateFor(
-  db: DB,
-  workerId: string,
-  plotId: string,
-  cropId: string,
-  variety?: string
-): number {
-  const settings = db.commissionSettings.filter(
-    (s) => s.workerId === workerId && s.plotId === plotId && s.cropId === cropId
-  );
+export function commissionRateFor(db: DB, workerId: string, cropId: string, variety?: string): number {
+  const settings = db.commissionSettings.filter((s) => s.workerId === workerId && s.cropId === cropId);
   const exact = variety ? settings.find((s) => s.variety === variety) : undefined;
   const anyVariety = settings.find((s) => !s.variety);
   const match = exact ?? anyVariety;
@@ -290,10 +288,8 @@ export function computePayroll(db: DB, month: string): PayrollLine[] {
       for (const h of harvests) byCrop.set(h.cropId, [...(byCrop.get(h.cropId) ?? []), h]);
       const commissionByCrop = [...byCrop.entries()].map(([cropId, list]) => {
         const kg = list.reduce((s, h) => s + h.quantityKg, 0);
-        const amount = list.reduce(
-          (s, h) => s + h.quantityKg * commissionRateFor(db, w.id, h.plotId, cropId, h.variety),
-          0
-        );
+        // uses each harvest's own locked-in rate, not today's Commission Settings
+        const amount = list.reduce((s, h) => s + h.quantityKg * h.commissionRate, 0);
         return { cropId, kg, rate: kg > 0 ? amount / kg : 0, amount };
       });
       const commissionTotal = commissionByCrop.reduce((s, c) => s + c.amount, 0);

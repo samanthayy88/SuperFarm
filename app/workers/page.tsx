@@ -298,8 +298,6 @@ function CommissionSettingsTab() {
           <thead>
             <tr>
               <Th>Worker</Th>
-              <Th>Farm</Th>
-              <Th>Plot</Th>
               <Th>Crop</Th>
               <Th>Variety</Th>
               <Th right>Rate (RM/kg)</Th>
@@ -309,14 +307,10 @@ function CommissionSettingsTab() {
           <tbody>
             {db.commissionSettings.map((s) => {
               const worker = db.workers.find((w) => w.id === s.workerId)?.name ?? "—";
-              const farm = db.farms.find((f) => f.id === s.farmId)?.name ?? "—";
-              const plot = db.plots.find((p) => p.id === s.plotId)?.name ?? "—";
               const crop = db.crops.find((c) => c.id === s.cropId)?.name ?? "—";
               return (
                 <tr key={s.id}>
                   <Td className="font-medium text-ink">{worker}</Td>
-                  <Td>{farm}</Td>
-                  <Td>{plot}</Td>
                   <Td>{crop}</Td>
                   <Td>{s.variety || <span className="text-muted">Any</span>}</Td>
                   <Td right>RM {s.ratePerKg.toFixed(2)}</Td>
@@ -349,7 +343,7 @@ function CommissionSettingsTab() {
       {deleteSetting && (
         <ConfirmDialog
           title="Delete this commission setting?"
-          message="This worker will go back to earning the crop's default rate for this plot."
+          message="This worker will go back to earning the crop's default rate. Past harvest records keep the rate they were recorded with, unaffected."
           confirmLabel="Delete setting"
           onConfirm={() => doDelete(deleteSetting)}
           onClose={() => setDeleteSetting(null)}
@@ -370,32 +364,15 @@ function CommissionSettingForm({
   const editing = Boolean(setting);
   const [form, setForm] = useState({
     workerId: setting?.workerId ?? db.workers[0]?.id ?? "",
-    farmId: setting?.farmId ?? db.farms[0]?.id ?? "",
-    plotId: setting?.plotId ?? "",
     cropId: setting?.cropId ?? db.crops[0]?.id ?? "",
     variety: setting?.variety ?? "",
     ratePerKg: setting ? String(setting.ratePerKg) : "",
   });
 
-  const plotsForFarm = db.plots.filter((p) => p.farmId === form.farmId);
-  const plotId = form.plotId && plotsForFarm.some((p) => p.id === form.plotId) ? form.plotId : plotsForFarm[0]?.id ?? "";
-
-  const setFarm = (farmId: string) => {
-    const firstPlot = db.plots.find((p) => p.farmId === farmId);
-    setForm({ ...form, farmId, plotId: firstPlot?.id ?? "", variety: firstPlot?.variety ?? "" });
-  };
-
-  const setPlot = (id: string) => {
-    const plot = db.plots.find((p) => p.id === id);
-    setForm({ ...form, plotId: id, variety: plot?.variety ?? form.variety });
-  };
-
   const submit = () => {
-    if (!plotId || !form.ratePerKg) return;
+    if (!form.workerId || !form.cropId || !form.ratePerKg) return;
     const payload = {
       workerId: form.workerId,
-      farmId: form.farmId,
-      plotId,
       cropId: form.cropId,
       variety: form.variety.trim() || undefined,
       ratePerKg: Number(form.ratePerKg) || 0,
@@ -411,6 +388,10 @@ function CommissionSettingForm({
   return (
     <Modal title={editing ? "Edit Commission Setting" : "Add Commission Setting"} onClose={onClose} wide>
       <div className="space-y-3">
+        <p className="text-xs text-muted">
+          Applies to this worker&apos;s harvests of this crop on any farm or plot — commission follows the crop, not the plot,
+          since plots get replanted with different crops over time.
+        </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Worker">
             <Select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
@@ -430,24 +411,6 @@ function CommissionSettingForm({
               ))}
             </Select>
           </Field>
-          <Field label="Farm">
-            <Select value={form.farmId} onChange={(e) => setFarm(e.target.value)}>
-              {db.farms.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Plot">
-            <Select value={plotId} onChange={(e) => setPlot(e.target.value)}>
-              {plotsForFarm.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
           <Field label="Variety (blank = any variety)">
             <VarietySelect cropId={form.cropId} varieties={db.varieties} value={form.variety} onChange={(v) => setForm({ ...form, variety: v })} />
           </Field>
@@ -460,6 +423,9 @@ function CommissionSettingForm({
             />
           </Field>
         </div>
+        <p className="text-xs text-muted">
+          This sets the rate for new harvests going forward. Past harvest records keep the rate they were recorded with.
+        </p>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onClose}>
             Cancel

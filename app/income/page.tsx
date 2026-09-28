@@ -51,10 +51,7 @@ export default function IncomePage() {
 
   const rows = db.harvests.filter((h) => h.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date));
   const totalKg = rows.reduce((s, h) => s + h.quantityKg, 0);
-  const totalCommission = rows.reduce(
-    (s, h) => s + h.quantityKg * commissionRateFor(db, h.workerId, h.plotId, h.cropId, h.variety),
-    0
-  );
+  const totalCommission = rows.reduce((s, h) => s + h.quantityKg * h.commissionRate, 0);
 
   const doDeleteHarvest = (h: HarvestRecord) => {
     update("harvests", (list) => list.filter((x) => x.id !== h.id));
@@ -163,7 +160,7 @@ export default function IncomePage() {
                   const plot = db.plots.find((p) => p.id === h.plotId);
                   const farm = db.farms.find((f) => f.id === plot?.farmId);
                   const crop = db.crops.find((c) => c.id === h.cropId);
-                  const rate = commissionRateFor(db, h.workerId, h.plotId, h.cropId, h.variety);
+                  const rate = h.commissionRate;
                   return (
                     <tr key={h.id}>
                       <Td>{fmtDate(h.date)}</Td>
@@ -432,18 +429,33 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
     plotId: firstPlot?.id ?? "",
     variety: harvest?.variety ?? firstPlot?.variety ?? "",
     quantityKg: harvest ? String(harvest.quantityKg) : "",
+    commissionRate:
+      harvest !== undefined
+        ? String(harvest.commissionRate)
+        : firstPlot
+          ? String(commissionRateFor(db, firstPlot.workerId, firstPlot.cropId, firstPlot.variety))
+          : "",
   });
 
   const plot = db.plots.find((p) => p.id === form.plotId);
   const crop = db.crops.find((c) => c.id === plot?.cropId);
   const worker = db.workers.find((w) => w.id === plot?.workerId);
   const qty = Number(form.quantityKg) || 0;
-  const rate = plot && crop ? commissionRateFor(db, plot.workerId, plot.id, crop.id, form.variety || undefined) : 0;
+  const rate = Number(form.commissionRate) || 0;
   const commission = qty * rate;
+  const currentSettingRate = worker && crop ? commissionRateFor(db, worker.id, crop.id, form.variety || undefined) : 0;
 
+  // plot/variety changing means the worker and/or crop may have changed too, so refresh the suggested
+  // rate to match — but this never touches an existing harvest's rate unless the user then saves
   const setPlot = (plotId: string) => {
     const p = db.plots.find((x) => x.id === plotId);
-    setForm({ ...form, plotId, variety: p?.variety ?? "" });
+    const suggested = p ? commissionRateFor(db, p.workerId, p.cropId, p.variety) : 0;
+    setForm({ ...form, plotId, variety: p?.variety ?? "", commissionRate: String(suggested) });
+  };
+
+  const setVariety = (variety: string) => {
+    const suggested = worker && crop ? commissionRateFor(db, worker.id, crop.id, variety || undefined) : 0;
+    setForm({ ...form, variety, commissionRate: String(suggested) });
   };
 
   const submit = () => {
@@ -455,6 +467,7 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
       cropId: plot.cropId,
       variety: form.variety.trim() || undefined,
       quantityKg: qty,
+      commissionRate: rate,
     };
     if (harvest) {
       update("harvests", (list) => list.map((h) => (h.id === harvest.id ? { ...h, ...payload } : h)));
@@ -494,16 +507,41 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
             cropId={plot?.cropId ?? ""}
             varieties={db.varieties}
             value={form.variety}
-            onChange={(v) => setForm({ ...form, variety: v })}
+            onChange={setVariety}
             anyLabel="No variety"
           />
         </Field>
         <div className="rounded border border-hairline bg-surface-2 p-3 text-sm">
-          <p className="text-muted">Auto-assigned</p>
-          <p className="mt-1 text-ink-2">Worker: <span className="font-medium">{worker?.name ?? "—"}</span></p>
-          <p className="text-ink-2">Crop: <span className="font-medium">{crop?.name ?? "—"}</span> at RM {rate.toFixed(2)}/kg</p>
-          <p className="mt-1 text-ink">Commission for this harvest: <span className="font-semibold">{fmtRM(commission)}</span></p>
+          <p className="text-ink-2">Worker: <span className="font-medium">{worker?.name ?? "—"}</span></p>
+          <p className="text-ink-2">Crop: <span className="font-medium">{crop?.name ?? "—"}</span></p>
         </div>
+        <Field label="Commission rate (RM/kg) — locked in for this harvest">
+          <TextInput
+            type="number"
+            step="0.01"
+            value={form.commissionRate}
+            onChange={(e) => setForm({ ...form, commissionRate: e.target.value })}
+          />
+        </Field>
+        {Math.abs(rate - currentSettingRate) > 0.001 && (
+          <p className="text-xs text-muted">
+            Current Commission Setting for this worker/crop/variety is RM {currentSettingRate.toFixed(2)}/kg.{" "}
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, commissionRate: String(currentSettingRate) })}
+              className="text-accent hover:underline"
+            >
+              Use current rate
+            </button>
+          </p>
+        )}
+        <div className="rounded border border-hairline bg-surface-2 p-3 text-sm">
+          <p className="text-ink">Commission for this harvest: <span className="font-semibold">{fmtRM(commission)}</span></p>
+        </div>
+        <p className="text-xs text-muted">
+          This rate is saved with the harvest — later changes to Commission Settings won&apos;t change it, or any commission,
+          payroll or payslip figures already calculated from it.
+        </p>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit}>{editing ? "Save changes" : "Save Harvest"}</Button>

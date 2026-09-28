@@ -138,18 +138,22 @@ export interface Worker {
 }
 
 /**
- * A worker's harvest-commission rate for one farm+plot+crop(+variety),
- * overriding the crop's global `commissionRatePerKg` for that worker.
+ * A worker's harvest-commission rate for one crop(+variety), overriding the
+ * crop's global `commissionRatePerKg` for that worker — wherever they harvest
+ * it, since the same plot gets replanted with different crops over time.
  * Matching prefers an exact variety match, then a blank-variety ("any
  * variety") setting, before falling back to the crop's global rate.
+ *
+ * This only sets the rate for *new* harvest records going forward — see
+ * `HarvestRecord.commissionRate`, which locks in the rate actually used at
+ * the time, so editing a setting here never rewrites past commission,
+ * payslip or expense figures.
  */
 export interface WorkerCommissionSetting {
   id: string;
   workerId: string;
-  farmId: string;
-  plotId: string;
   cropId: string;
-  variety?: string; // blank = applies to any variety of this crop on this plot
+  variety?: string; // blank = applies to any variety of this crop
   ratePerKg: number; // RM per kg harvested
 }
 
@@ -192,6 +196,13 @@ export interface HarvestRecord {
   cropId: string;
   variety?: string;
   quantityKg: number;
+  /**
+   * RM/kg locked in when this harvest was recorded (from the worker's
+   * Commission Setting or the crop's default rate at the time). Commission,
+   * payroll and payslip figures always use this stored rate, never a live
+   * lookup — so changing a Commission Setting later never rewrites history.
+   */
+  commissionRate: number;
 }
 
 // ---------- Schedule ----------

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useSyncExternalStore } from "react";
 import { DB } from "./types";
 import { seedDB } from "./seed";
+import { commissionRateFor } from "./utils";
 
 const STORAGE_KEY = "farm-dashboard-db-v1";
 
@@ -28,6 +29,12 @@ function migrate(db: DB): DB {
       const legacy = (t as { notes?: string }).notes;
       return t.remarks || !legacy ? t : { ...t, remarks: legacy };
     }),
+    // harvests saved before commissionRate was locked in per-record: back-fill
+    // once from whatever Commission Settings apply today, so old saves still
+    // load with a rate. Never runs again once every harvest has one.
+    harvests: (db.harvests ?? []).map((h) =>
+      h.commissionRate !== undefined ? h : { ...h, commissionRate: commissionRateFor(db, h.workerId, h.cropId, h.variety) }
+    ),
   };
 }
 
