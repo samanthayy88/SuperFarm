@@ -122,12 +122,46 @@ export function fmtDuration(days: number): string {
 }
 
 // ---------- Loans ----------
+
+/**
+ * The month tracking effectively starts from ("YYYY-MM"). Normally the loan's
+ * startDate — but if a `currentBalance` was entered (added to the dashboard
+ * partway through repayment, balance already known rather than reconstructed
+ * month by month), tracking starts from `balanceAsOfDate` instead, so months
+ * before that are never flagged as missed.
+ */
+export function loanEffectiveStart(l: Loan): string {
+  return (l.currentBalance !== undefined ? l.balanceAsOfDate ?? l.startDate : l.startDate).slice(0, 7);
+}
+
+/**
+ * How many months are tracked from `loanEffectiveStart`. Normally `tenureMonths`
+ * as entered — but for a `currentBalance` loan it's derived from the balance
+ * itself (balance ÷ installment), since the original tenure may not be known
+ * or may no longer apply.
+ */
+export function loanTrackedMonths(l: Loan): number {
+  if (l.currentBalance === undefined) return l.tenureMonths;
+  if (l.monthlyInstallment <= 0) return 0;
+  return Math.ceil(l.currentBalance / l.monthlyInstallment);
+}
+
+/** Whether `month` ("YYYY-MM") falls within a loan's tracked span. */
+export function loanMonthWithinTenure(l: Loan, month: string): boolean {
+  const start = loanEffectiveStart(l);
+  if (month < start) return false;
+  const [sy, sm] = start.split("-").map(Number);
+  const [my, mm] = month.split("-").map(Number);
+  const idx = (my - sy) * 12 + (mm - sm);
+  return idx < loanTrackedMonths(l);
+}
+
 export function loanMonthsElapsed(l: Loan): string[] {
-  const start = new Date(l.startDate);
+  const start = new Date(loanEffectiveStart(l) + "-01");
   const out: string[] = [];
   const cur = new Date(Math.max(start.getTime(), new Date(TODAY.getFullYear(), 0, 1).getTime()));
   cur.setDate(1);
-  const endOfTenure = new Date(start.getFullYear(), start.getMonth() + l.tenureMonths, 1);
+  const endOfTenure = new Date(start.getFullYear(), start.getMonth() + loanTrackedMonths(l), 1);
   const stop = endOfTenure < TODAY ? endOfTenure : TODAY;
   while (cur <= stop) {
     out.push(monthKey(cur));
@@ -141,7 +175,18 @@ export function unpaidLoanMonths(l: Loan): string[] {
 }
 
 export function loanBalance(l: Loan): number {
+  if (l.currentBalance !== undefined) {
+    const since = loanEffectiveStart(l);
+    const paidSince = l.paidMonths.filter((m) => m >= since).length;
+    return Math.max(0, l.currentBalance - paidSince * l.monthlyInstallment);
+  }
   return Math.max(0, l.principal - l.paidMonths.length * l.monthlyInstallment);
+}
+
+/** Live estimate of months left to pay off, shrinking as installments are marked paid. */
+export function loanMonthsRemaining(l: Loan): number {
+  if (l.monthlyInstallment <= 0) return 0;
+  return Math.ceil(loanBalance(l) / l.monthlyInstallment);
 }
 
 // ---------- Sales ----------

@@ -3,18 +3,21 @@
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Button, Modal, Field, TextInput, Select, StatCard, EmptyState, ConfirmDialog, MonthSelect } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, unpaidLoanMonths, loanBalance, currentMonthKey, monthLabel, lastNMonthKeys } from "@/lib/utils";
+import {
+  fmtRM,
+  fmtRM0,
+  fmtDate,
+  unpaidLoanMonths,
+  loanBalance,
+  loanMonthsRemaining,
+  loanMonthWithinTenure,
+  loanEffectiveStart,
+  currentMonthKey,
+  monthLabel,
+  lastNMonthKeys,
+  TODAY,
+} from "@/lib/utils";
 import { Loan } from "@/lib/types";
-
-/** Whether `month` ("YYYY-MM") falls within a loan's tenure, counting from its start month. */
-function monthWithinTenure(l: Loan, month: string): boolean {
-  const start = l.startDate.slice(0, 7);
-  if (month < start) return false;
-  const [sy, sm] = start.split("-").map(Number);
-  const [my, mm] = month.split("-").map(Number);
-  const idx = (my - sy) * 12 + (mm - sm);
-  return idx < l.tenureMonths;
-}
 
 export default function LoansPage() {
   const { db, update } = useStore();
@@ -31,8 +34,8 @@ export default function LoansPage() {
 
   const totalBorrowed = db.loans.reduce((s, l) => s + l.principal, 0);
   const totalBalance = db.loans.reduce((s, l) => s + loanBalance(l), 0);
-  const monthlyDue = db.loans.filter((l) => monthWithinTenure(l, month)).reduce((s, l) => s + l.monthlyInstallment, 0);
-  const unpaidCount = db.loans.filter((l) => monthWithinTenure(l, month) && !l.paidMonths.includes(month)).length;
+  const monthlyDue = db.loans.filter((l) => loanMonthWithinTenure(l, month)).reduce((s, l) => s + l.monthlyInstallment, 0);
+  const unpaidCount = db.loans.filter((l) => loanMonthWithinTenure(l, month) && !l.paidMonths.includes(month)).length;
 
   const togglePaid = (loanId: string, m: string) => {
     update("loans", (list) =>
@@ -98,8 +101,19 @@ export default function LoansPage() {
                 <span className="text-ink-2"><span className="text-muted">Principal:</span> {fmtRM0(l.principal)}</span>
                 <span className="text-ink-2"><span className="text-muted">Interest:</span> {l.interestRatePct}% p.a.</span>
                 <span className="text-ink-2"><span className="text-muted">Installment:</span> {fmtRM(l.monthlyInstallment)}/month</span>
-                <span className="text-ink-2"><span className="text-muted">Tenure:</span> {l.tenureMonths} months from {fmtDate(l.startDate)}</span>
-                <span className="text-ink-2"><span className="text-muted">Balance:</span> <span className="font-medium">{fmtRM0(loanBalance(l))}</span></span>
+                {l.currentBalance !== undefined ? (
+                  <span className="text-ink-2">
+                    <span className="text-muted">Balance as of:</span> {fmtDate(l.balanceAsOfDate ?? l.startDate)}
+                  </span>
+                ) : (
+                  <span className="text-ink-2"><span className="text-muted">Tenure:</span> {l.tenureMonths} months from {fmtDate(l.startDate)}</span>
+                )}
+                <span className="text-ink-2">
+                  <span className="text-muted">Balance:</span> <span className="font-medium">{fmtRM0(loanBalance(l))}</span>
+                  {l.monthlyInstallment > 0 && (
+                    <span className="text-muted"> (~{loanMonthsRemaining(l)} mo{loanMonthsRemaining(l) === 1 ? "" : "s"} left)</span>
+                  )}
+                </span>
                 {l.notes && <span className="text-muted italic">{l.notes}</span>}
               </div>
 
@@ -115,9 +129,9 @@ export default function LoansPage() {
               )}
 
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Installment — {monthLabel(month)} (click to mark paid/unpaid)</p>
-              {!monthWithinTenure(l, month) ? (
+              {!loanMonthWithinTenure(l, month) ? (
                 <span className="inline-block rounded border border-hairline px-3 py-1.5 text-xs text-muted/50">
-                  {month < l.startDate.slice(0, 7) ? "Loan hadn't started yet" : "Loan tenure already ended"}
+                  {month < loanEffectiveStart(l) ? "Loan hadn't started yet" : "Loan tenure already ended"}
                 </span>
               ) : (
                 (() => {
@@ -172,8 +186,14 @@ function LoanForm({ loan, onClose }: { loan?: Loan; onClose: () => void }) {
     monthlyInstallment: loan ? String(loan.monthlyInstallment) : "",
     startDate: loan?.startDate ?? "",
     tenureMonths: loan ? String(loan.tenureMonths) : "",
+    currentBalance: loan?.currentBalance !== undefined ? String(loan.currentBalance) : "",
+    balanceAsOfDate: loan?.balanceAsOfDate ?? TODAY.toISOString().slice(0, 10),
     notes: loan?.notes ?? "",
   });
+
+  const installment = Number(form.monthlyInstallment) || 0;
+  const balanceNum = form.currentBalance.trim() ? Number(form.currentBalance) || 0 : undefined;
+  const monthsRemaining = balanceNum !== undefined && installment > 0 ? Math.ceil(balanceNum / installment) : null;
 
   const submit = () => {
     if (!form.lender || !form.startDate) return;
@@ -182,9 +202,11 @@ function LoanForm({ loan, onClose }: { loan?: Loan; onClose: () => void }) {
       lenderType: form.lenderType,
       principal: Number(form.principal) || 0,
       interestRatePct: Number(form.interestRatePct) || 0,
-      monthlyInstallment: Number(form.monthlyInstallment) || 0,
+      monthlyInstallment: installment,
       startDate: form.startDate,
       tenureMonths: Number(form.tenureMonths) || 12,
+      currentBalance: balanceNum,
+      balanceAsOfDate: balanceNum !== undefined ? form.balanceAsOfDate || TODAY.toISOString().slice(0, 10) : undefined,
       notes: form.notes || undefined,
     };
     if (loan) {
@@ -225,6 +247,28 @@ function LoanForm({ loan, onClose }: { loan?: Loan; onClose: () => void }) {
         <Field label="Start date">
           <TextInput type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
         </Field>
+
+        <div className="rounded-lg border border-hairline bg-surface-2 p-3">
+          <p className="mb-1 text-xs font-semibold text-ink-2">STARTING PARTWAY THROUGH? (optional)</p>
+          <p className="mb-3 text-xs text-muted">
+            Already know the current balance instead of the full history of paid months? Enter it here — months
+            remaining will be calculated from it instead of the tenure above, and past months won&apos;t be flagged as missed.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Current balance (RM)">
+              <TextInput type="number" value={form.currentBalance} onChange={(e) => setForm({ ...form, currentBalance: e.target.value })} />
+            </Field>
+            <Field label="As of date">
+              <TextInput type="date" value={form.balanceAsOfDate} onChange={(e) => setForm({ ...form, balanceAsOfDate: e.target.value })} />
+            </Field>
+          </div>
+          {monthsRemaining !== null && (
+            <p className="mt-2 text-xs text-ink">
+              ≈ <span className="font-semibold">{monthsRemaining} month{monthsRemaining === 1 ? "" : "s"}</span> remaining at {fmtRM(installment)}/month
+            </p>
+          )}
+        </div>
+
         <Field label="Notes">
           <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </Field>

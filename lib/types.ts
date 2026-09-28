@@ -97,6 +97,14 @@ export interface Loan {
   startDate: string;
   tenureMonths: number;
   paidMonths: string[]; // "2026-07"
+  /**
+   * Known outstanding balance as of `balanceAsOfDate`, for a loan added to the
+   * dashboard partway through repayment — overrides the principal-minus-paid-
+   * months calculation, and months remaining is derived from it instead of
+   * `tenureMonths`. Leave unset for a loan tracked from its first payment.
+   */
+  currentBalance?: number;
+  balanceAsOfDate?: string;
   notes?: string;
 }
 
