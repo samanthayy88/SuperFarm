@@ -427,19 +427,22 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
   const [form, setForm] = useState({
     date: harvest?.date ?? new Date().toISOString().slice(0, 10),
     plotId: firstPlot?.id ?? "",
+    workerId: harvest?.workerId ?? firstPlot?.workerIds[0] ?? "",
     variety: harvest?.variety ?? firstPlot?.variety ?? "",
     quantityKg: harvest ? String(harvest.quantityKg) : "",
     commissionRate:
       harvest !== undefined
         ? String(harvest.commissionRate)
         : firstPlot
-          ? String(commissionRateFor(db, firstPlot.workerId, firstPlot.cropId, firstPlot.variety))
+          ? String(commissionRateFor(db, firstPlot.workerIds[0] ?? "", firstPlot.cropId, firstPlot.variety))
           : "",
   });
 
   const plot = db.plots.find((p) => p.id === form.plotId);
   const crop = db.crops.find((c) => c.id === plot?.cropId);
-  const worker = db.workers.find((w) => w.id === plot?.workerId);
+  const worker = db.workers.find((w) => w.id === form.workerId);
+  // the plot's workers; an existing harvest keeps its worker even if they've since left the plot
+  const plotWorkers = db.workers.filter((w) => plot?.workerIds.includes(w.id) || w.id === harvest?.workerId);
   const qty = Number(form.quantityKg) || 0;
   const rate = Number(form.commissionRate) || 0;
   const commission = qty * rate;
@@ -449,8 +452,15 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
   // rate to match — but this never touches an existing harvest's rate unless the user then saves
   const setPlot = (plotId: string) => {
     const p = db.plots.find((x) => x.id === plotId);
-    const suggested = p ? commissionRateFor(db, p.workerId, p.cropId, p.variety) : 0;
-    setForm({ ...form, plotId, variety: p?.variety ?? "", commissionRate: String(suggested) });
+    const workerId = p?.workerIds[0] ?? "";
+    const suggested = p ? commissionRateFor(db, workerId, p.cropId, p.variety) : 0;
+    setForm({ ...form, plotId, workerId, variety: p?.variety ?? "", commissionRate: String(suggested) });
+  };
+
+  // a different worker may have a different rate for the same crop
+  const setWorker = (workerId: string) => {
+    const suggested = plot ? commissionRateFor(db, workerId, plot.cropId, form.variety || undefined) : 0;
+    setForm({ ...form, workerId, commissionRate: String(suggested) });
   };
 
   const setVariety = (variety: string) => {
@@ -463,7 +473,7 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
     const payload = {
       date: form.date,
       plotId: plot.id,
-      workerId: plot.workerId,
+      workerId: form.workerId,
       cropId: plot.cropId,
       variety: form.variety.trim() || undefined,
       quantityKg: qty,
@@ -511,8 +521,17 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
             anyLabel="No variety"
           />
         </Field>
+        <Field label="Worker who harvested">
+          <Select value={form.workerId} onChange={(e) => setWorker(e.target.value)}>
+            {plotWorkers.length === 0 && <option value="">No worker assigned to this plot</option>}
+            {plotWorkers.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <div className="rounded border border-hairline bg-surface-2 p-3 text-sm">
-          <p className="text-ink-2">Worker: <span className="font-medium">{worker?.name ?? "—"}</span></p>
           <p className="text-ink-2">Crop: <span className="font-medium">{crop?.name ?? "—"}</span></p>
         </div>
         <Field label="Commission rate (RM/kg) — locked in for this harvest">

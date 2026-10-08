@@ -252,7 +252,7 @@ export default function Overview() {
             <tbody>
               {db.farms.map((f) => {
                 const plots = db.plots.filter((p) => p.farmId === f.id);
-                const workers = new Set(plots.map((p) => p.workerId)).size;
+                const workers = new Set(plots.flatMap((p) => p.workerIds)).size;
                 return (
                   <tr key={f.id}>
                     <Td className="font-medium">{f.name}</Td>

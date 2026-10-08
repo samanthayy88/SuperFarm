@@ -22,7 +22,17 @@ function migrate(db: DB): DB {
     plots: (db.plots ?? []).map((p) => {
       const cycle = { ...(p.cycle ?? {}) };
       if (!cycle.planting && p.plantedDate) cycle.planting = p.plantedDate;
-      return { ...p, cycle, history: p.history ?? [] };
+      // a plot used to have exactly one worker; it can now have several
+      const { workerId, ...rest } = p;
+      return {
+        ...rest,
+        workerIds: p.workerIds ?? (workerId ? [workerId] : []),
+        cycle,
+        history: (p.history ?? []).map((r) => {
+          const { workerId: legacy, ...r2 } = r;
+          return { ...r2, workerIds: r.workerIds ?? (legacy ? [legacy] : []) };
+        }),
+      };
     }),
     // scheduled tasks used to carry a `notes` field; it is now `remarks`
     tasks: (db.tasks ?? []).map((t) => {

@@ -392,3 +392,9 @@ export function averageCycleDaysByCrop(plots: Plot[], cropId: string): number | 
   if (lengths.length === 0) return null;
   return Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
 }
+
+/** "Worker A, Worker B" for a plot's (or archived cycle's) workers; "—" when none. */
+export function workerNames(db: DB, ids: string[] | undefined): string {
+  const names = (ids ?? []).map((id) => db.workers.find((w) => w.id === id)?.name).filter(Boolean);
+  return names.length ? names.join(", ") : "—";
+}

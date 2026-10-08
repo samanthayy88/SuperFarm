@@ -221,6 +221,42 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={inputClass} />;
 }
 
+/** Pick any number of workers: a row of toggle chips, one per worker. */
+export function WorkerMultiSelect({
+  workers,
+  value,
+  onChange,
+}: {
+  workers: { id: string; name: string }[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {workers.map((w) => {
+        const on = value.includes(w.id);
+        return (
+          <button
+            key={w.id}
+            type="button"
+            role="checkbox"
+            aria-checked={on}
+            onClick={() => toggle(w.id)}
+            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              on ? "border-ink bg-ink text-white" : "border-hairline bg-surface text-ink-2 hover:bg-surface-2"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {w.name}
+          </button>
+        );
+      })}
+      {workers.length === 0 && <span className="text-sm text-muted">No workers yet — add one under People.</span>}
+    </div>
+  );
+}
+
 /** ClickUp-style pill dropdown for picking a "YYYY-MM" month, e.g. "Sept 2026". */
 export function MonthSelect({
   value,

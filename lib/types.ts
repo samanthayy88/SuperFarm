@@ -37,7 +37,10 @@ export interface PlotCycleRecord {
   id: string;
   cropId: string;
   variety?: string;
-  workerId: string;
+  /** Workers who handled the plot during this cycle. */
+  workerIds: string[];
+  /** @deprecated single-worker field from older saves; migrated to `workerIds` on read. */
+  workerId?: string;
   cycle: PlotCycle;
   /** ISO date the cycle was archived (i.e. when the new one began). */
   archivedAt: string;
@@ -50,7 +53,10 @@ export interface Plot {
   sizeAcres: number;
   cropId: string;
   variety?: string; // e.g. "Kulai", "Centel F1"
-  workerId: string; // worker managing this plot
+  /** Workers handling this plot - a plot can have more than one. */
+  workerIds: string[];
+  /** @deprecated single-worker field from older saves; migrated to `workerIds` on read. */
+  workerId?: string;
   cycle: PlotCycle;
   /** Past cycles for this plot, most recent first. See "Start New Cycle". */
   history: PlotCycleRecord[];

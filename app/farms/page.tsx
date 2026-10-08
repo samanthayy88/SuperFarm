@@ -17,6 +17,7 @@ import {
   EmptyState,
   ConfirmDialog,
   StatCard,
+  WorkerMultiSelect,
 } from "@/components/ui";
 import {
   fmtDate,
@@ -27,6 +28,7 @@ import {
   nextStage,
   averageCycleDaysByCrop,
   latestContractForFarm,
+  workerNames,
 } from "@/lib/utils";
 import { Farm, Plot, PlotCycle, PlotCycleRecord, PLOT_STAGES, PLOT_STAGE_LABELS } from "@/lib/types";
 import VarietySelect from "@/components/VarietySelect";
@@ -115,7 +117,7 @@ export default function FarmsPage() {
                 id: newId("cyc"),
                 cropId: p.cropId,
                 variety: p.variety,
-                workerId: p.workerId,
+                workerIds: p.workerIds,
                 cycle: p.cycle,
                 archivedAt: new Date().toISOString().slice(0, 10),
               },
@@ -220,7 +222,7 @@ export default function FarmsPage() {
                       <Th>Crop</Th>
                       <Th>Variety</Th>
                       <Th right>Size</Th>
-                      <Th>Managed by</Th>
+                      <Th>Workers</Th>
                       <Th>Stage</Th>
                       <Th right>Cycle</Th>
                       <Th>Status</Th>
@@ -230,7 +232,7 @@ export default function FarmsPage() {
                   <tbody>
                     {plots.map((p) => {
                       const crop = db.crops.find((c) => c.id === p.cropId)?.name ?? "—";
-                      const worker = db.workers.find((w) => w.id === p.workerId)?.name ?? "—";
+                      const worker = workerNames(db, p.workerIds);
                       const steps = cycleSteps(p.cycle);
                       const stage = currentStage(p.cycle);
                       const upcoming = nextStage(p.cycle);
@@ -507,7 +509,7 @@ function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }
               <Th>Crop</Th>
               <Th>Variety</Th>
               <Th right>Size</Th>
-              <Th>Managed by</Th>
+              <Th>Workers</Th>
               <Th>Stage</Th>
               <Th right>Cycle</Th>
               <Th>Status</Th>
@@ -518,7 +520,7 @@ function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }
             {rows.map((row) => {
               const { plot, record } = row;
               const crop = db.crops.find((c) => c.id === record.cropId)?.name ?? "—";
-              const worker = db.workers.find((w) => w.id === record.workerId)?.name ?? "—";
+              const worker = workerNames(db, record.workerIds);
               const steps = cycleSteps(record.cycle);
               const stage = currentStage(record.cycle);
               const total = cycleDurationDays(record.cycle);
@@ -622,7 +624,7 @@ function HistoryRecordForm({ row, onClose }: { row: HistoryRow; onClose: () => v
   const [form, setForm] = useState({
     cropId: record.cropId,
     variety: record.variety ?? "",
-    workerId: record.workerId,
+    workerIds: record.workerIds,
   });
   const [cycle, setCycle] = useState<PlotCycle>(record.cycle);
 
@@ -648,7 +650,7 @@ function HistoryRecordForm({ row, onClose }: { row: HistoryRow; onClose: () => v
               ...p,
               history: (p.history ?? []).map((r) =>
                 r.id === record.id
-                  ? { ...r, cropId: form.cropId, variety: form.variety.trim() || undefined, workerId: form.workerId, cycle }
+                  ? { ...r, cropId: form.cropId, variety: form.variety.trim() || undefined, workerIds: form.workerIds, cycle }
                   : r
               ),
             }
@@ -680,15 +682,11 @@ function HistoryRecordForm({ row, onClose }: { row: HistoryRow; onClose: () => v
               anyLabel="No variety"
             />
           </Field>
-          <Field label="Managed by worker">
-            <Select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
-              {db.workers.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Workers on this plot">
+              <WorkerMultiSelect workers={db.workers} value={form.workerIds} onChange={(ids) => setForm({ ...form, workerIds: ids })} />
+            </Field>
+          </div>
         </div>
 
         <div className="rounded-lg border border-hairline bg-surface-2 p-3">
@@ -813,7 +811,7 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
     sizeAcres: plot ? String(plot.sizeAcres) : "",
     cropId: plot?.cropId ?? db.crops[0]?.id ?? "",
     variety: plot?.variety ?? "",
-    workerId: plot?.workerId ?? db.workers[0]?.id ?? "",
+    workerIds: plot?.workerIds ?? (db.workers[0] ? [db.workers[0].id] : []),
     status: plot?.status ?? ("Preparing" as Plot["status"]),
   });
   const [cycle, setCycle] = useState<PlotCycle>(plot?.cycle ?? {});
@@ -835,7 +833,7 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
           id: newId("cyc"),
           cropId: form.cropId,
           variety: form.variety.trim() || undefined,
-          workerId: form.workerId,
+          workerIds: form.workerIds,
           cycle,
           archivedAt: new Date().toISOString().slice(0, 10),
         },
@@ -862,7 +860,7 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
       sizeAcres: Number(form.sizeAcres) || 0,
       cropId: form.cropId,
       variety: form.variety.trim() || undefined,
-      workerId: form.workerId,
+      workerIds: form.workerIds,
       status: form.status,
       cycle,
       history,
@@ -914,17 +912,15 @@ function PlotForm({ farmId, plot, onClose }: { farmId: string; plot?: Plot; onCl
               anyLabel="No variety"
             />
           </Field>
-          <Field label="Managed by worker">
-            <Select value={form.workerId} onChange={(e) => setForm({ ...form, workerId: e.target.value })}>
-              {db.workers
-                .filter((w) => w.active)
-                .map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-            </Select>
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Workers on this plot (select one or more)">
+              <WorkerMultiSelect
+                workers={db.workers.filter((w) => w.active || form.workerIds.includes(w.id))}
+                value={form.workerIds}
+                onChange={(ids) => setForm({ ...form, workerIds: ids })}
+              />
+            </Field>
+          </div>
           <Field label="Status">
             <Select
               value={form.status}

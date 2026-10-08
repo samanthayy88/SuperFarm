@@ -44,6 +44,7 @@ export default function WorkersPage() {
     setDB((prev) => ({
       ...prev,
       workers: prev.workers.filter((x) => x.id !== w.id),
+      plots: prev.plots.map((p) => (p.workerIds.includes(w.id) ? { ...p, workerIds: p.workerIds.filter((id) => id !== w.id) } : p)),
       workerExpenses: prev.workerExpenses.filter((e) => e.workerId !== w.id),
       commissionSettings: prev.commissionSettings.filter((c) => c.workerId !== w.id),
       harvestTargets: prev.harvestTargets.filter((t) => t.workerId !== w.id),
@@ -52,7 +53,7 @@ export default function WorkersPage() {
   };
 
   const activeWorkers = db.workers.filter((w) => w.active).length;
-  const managedPlots = deleteWorker ? db.plots.filter((p) => p.workerId === deleteWorker.id).length : 0;
+  const managedPlots = deleteWorker ? db.plots.filter((p) => p.workerIds.includes(deleteWorker.id)).length : 0;
 
   return (
     <div>
@@ -86,7 +87,7 @@ export default function WorkersPage() {
           <div className="space-y-4">
             {db.workers.map((w) => {
               const farm = db.farms.find((f) => f.id === w.farmId)?.name ?? "—";
-              const plots = db.plots.filter((p) => p.workerId === w.id);
+              const plots = db.plots.filter((p) => p.workerIds.includes(w.id));
               return (
                 <Card
                   key={w.id}
@@ -156,7 +157,7 @@ export default function WorkersPage() {
           title={`Delete ${deleteWorker.name}?`}
           message={`“${deleteWorker.name}” will be removed.${
             managedPlots > 0
-              ? ` ${managedPlots} plot(s) currently list them as manager — you'll want to reassign those in Farms & Plots.`
+              ? ` ${managedPlots} plot(s) currently list them as a worker — they'll be taken off those plots.`
               : ""
           } Harvest and schedule history under their name is kept for records.`}
           impacts={workerImpacts(deleteWorker)}
