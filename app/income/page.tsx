@@ -33,9 +33,12 @@ import {
   saleDueDate,
   saleOverdueDays,
   pendingStockKg,
+  totalHarvestedKg,
+  totalSoldKg,
+  totalWastedKg,
   TODAY,
 } from "@/lib/utils";
-import { HarvestRecord, SaleRecord, SaleGradeLine } from "@/lib/types";
+import { HarvestRecord, SaleRecord, SaleGradeLine, WasteRecord, WasteReason } from "@/lib/types";
 import VarietySelect from "@/components/VarietySelect";
 
 export default function IncomePage() {
@@ -84,9 +87,38 @@ export default function IncomePage() {
     );
   };
 
-  const stockRows = db.crops
-    .map((c) => ({ crop: c, pending: pendingStockKg(db, c.id) }))
-    .filter((r) => db.harvests.some((h) => h.cropId === r.crop.id));
+  // ---- Wastage ----
+  const [wasteForm, setWasteForm] = useState<
+    { mode: "add"; cropId?: string; quantityKg?: number } | { mode: "edit"; waste: WasteRecord } | null
+  >(null);
+  const [deleteWaste, setDeleteWaste] = useState<WasteRecord | null>(null);
+
+  // ---- Volume overview: every crop ever harvested, all time ----
+  const volumeRows = db.crops
+    .map((c) => {
+      const harvested = totalHarvestedKg(db, c.id);
+      const sold = totalSoldKg(db, c.id);
+      const wasted = totalWastedKg(db, c.id);
+      return { crop: c, harvested, sold, wasted, inStock: harvested - sold - wasted };
+    })
+    .filter((r) => r.harvested > 0 || r.sold > 0 || r.wasted > 0);
+  const vol = volumeRows.reduce(
+    (t, r) => ({
+      harvested: t.harvested + r.harvested,
+      sold: t.sold + r.sold,
+      wasted: t.wasted + r.wasted,
+      inStock: t.inStock + r.inStock,
+    }),
+    { harvested: 0, sold: 0, wasted: 0, inStock: 0 }
+  );
+  const unsold = vol.harvested - vol.sold; // everything not sold: still in store + written off
+  const pctOf = (n: number) => (vol.harvested > 0 ? `${((n / vol.harvested) * 100).toFixed(1)}% of harvest` : "—");
+
+  const doDeleteWaste = (w: WasteRecord) => {
+    update("wastage", (list) => list.filter((x) => x.id !== w.id));
+    setDeleteWaste(null);
+  };
+  const wasteRows = [...(db.wastage ?? [])].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div>
@@ -109,10 +141,23 @@ export default function IncomePage() {
             </>
           ) : tab === "Sales" ? (
             <Button onClick={() => setSaleForm({})}>+ Record Sale</Button>
+          ) : tab === "Wastage" ? (
+            <Button onClick={() => setWasteForm({ mode: "add" })}>+ Record Wastage</Button>
           ) : undefined
         }
       />
 
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total harvested" value={`${vol.harvested.toLocaleString()} kg`} sub="All time, all crops" />
+        <StatCard label="Total sold" value={`${vol.sold.toLocaleString()} kg`} sub={pctOf(vol.sold)} tone="good" />
+        <StatCard
+          label="Total unsold"
+          value={`${unsold.toLocaleString()} kg`}
+          sub={`${vol.inStock.toLocaleString()} kg in store · ${vol.wasted.toLocaleString()} kg written off`}
+          tone={unsold > 0 ? "warning" : undefined}
+        />
+        <StatCard label="Written off (rotten / lost)" value={`${vol.wasted.toLocaleString()} kg`} sub={`${pctOf(vol.wasted)} — cost absorbed by the farm`} tone={vol.wasted > 0 ? "critical" : undefined} />
+      </div>
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label={`Harvested — ${monthLabel(month)}`} value={`${totalKg.toLocaleString()} kg`} sub={`${fmtRM(totalCommission)} commission`} />
         <StatCard label={`Revenue ${year}`} value={fmtRM0(yearRevenue)} sub={`${yearKg.toLocaleString()} kg sold`} />
@@ -120,21 +165,74 @@ export default function IncomePage() {
         <StatCard label="Overdue payments" value={String(overdue.length)} tone={overdue.length > 0 ? "critical" : "good"} sub="Past collector payment term" />
       </div>
 
-      <Card title="Stock awaiting sale — harvested minus sold, all time" className="mb-6">
-        {stockRows.length === 0 ? (
+      <Card title="Volume overview by crop — all time" className="mb-6">
+        {volumeRows.length === 0 ? (
           <EmptyState message="No harvests recorded yet." />
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {stockRows.map(({ crop, pending: p }) => (
-              <Badge key={crop.id} tone={p > 0 ? "warning" : p < 0 ? "critical" : "good"}>
-                {crop.name}: {p.toLocaleString()} kg {p > 0 ? "pending" : p < 0 ? "oversold" : "fully sold"}
-              </Badge>
-            ))}
-          </div>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Crop</Th>
+                <Th right>Harvested</Th>
+                <Th right>Sold</Th>
+                <Th right>Unsold</Th>
+                <Th right>In store</Th>
+                <Th right>Written off</Th>
+                <Th right>% sold</Th>
+                <Th />
+              </tr>
+            </thead>
+            <tbody>
+              {volumeRows.map((r) => (
+                <tr key={r.crop.id}>
+                  <Td className="font-medium text-ink">{r.crop.name}</Td>
+                  <Td right>{r.harvested.toLocaleString()} kg</Td>
+                  <Td right>{r.sold.toLocaleString()} kg</Td>
+                  <Td right>{(r.harvested - r.sold).toLocaleString()} kg</Td>
+                  <Td right>
+                    {r.inStock < 0 ? (
+                      <Badge tone="critical">{r.inStock.toLocaleString()} kg oversold</Badge>
+                    ) : (
+                      <span className={r.inStock > 0 ? "text-warning" : ""}>{r.inStock.toLocaleString()} kg</span>
+                    )}
+                  </Td>
+                  <Td right>{r.wasted > 0 ? <span className="text-critical">{r.wasted.toLocaleString()} kg</span> : "—"}</Td>
+                  <Td right>{r.harvested > 0 ? `${((r.sold / r.harvested) * 100).toFixed(0)}%` : "—"}</Td>
+                  <Td>
+                    {r.inStock > 0 && (
+                      <button
+                        onClick={() => {
+                          setWasteForm({ mode: "add", cropId: r.crop.id, quantityKg: r.inStock });
+                          setTab("Wastage");
+                        }}
+                        className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                      >
+                        Write off
+                      </button>
+                    )}
+                  </Td>
+                </tr>
+              ))}
+              <tr>
+                <Td className="font-semibold">Total</Td>
+                <Td right className="font-semibold">{vol.harvested.toLocaleString()} kg</Td>
+                <Td right className="font-semibold">{vol.sold.toLocaleString()} kg</Td>
+                <Td right className="font-semibold">{unsold.toLocaleString()} kg</Td>
+                <Td right className="font-semibold">{vol.inStock.toLocaleString()} kg</Td>
+                <Td right className="font-semibold">{vol.wasted.toLocaleString()} kg</Td>
+                <Td right className="font-semibold">{vol.harvested > 0 ? `${((vol.sold / vol.harvested) * 100).toFixed(0)}%` : "—"}</Td>
+                <Td />
+              </tr>
+            </tbody>
+          </Table>
         )}
+        <p className="mt-3 text-xs text-muted">
+          Unsold = harvested − sold. It is either still in the store or written off (rotten, damaged, given away). Written-off
+          produce earns no income but its growing cost stays in the farm&apos;s books — see Data &amp; Analysis › Costing by Crop.
+        </p>
       </Card>
 
-      <Tabs tabs={["Harvest Records", "Sales", "Average Price by Crop", "Collector Payments"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["Harvest Records", "Sales", "Wastage", "Average Price by Crop", "Collector Payments"]} active={tab} onChange={setTab} />
 
       {tab === "Harvest Records" && (
         <Card title={`Harvest records — ${monthLabel(month)}`}>
@@ -191,6 +289,60 @@ export default function IncomePage() {
                           </button>
                           <button
                             onClick={() => setDeleteHarvest(h)}
+                            className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+      )}
+
+      {tab === "Wastage" && (
+        <Card title="Wastage — harvested produce that was not sold">
+          {wasteRows.length === 0 ? (
+            <EmptyState message="Nothing written off. Use “+ Record Wastage” when produce rots, is rejected or is left over for good." />
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Farm / Plot</Th>
+                  <Th>Crop</Th>
+                  <Th right>Quantity</Th>
+                  <Th>Reason</Th>
+                  <Th>Notes</Th>
+                  <Th />
+                </tr>
+              </thead>
+              <tbody>
+                {wasteRows.map((w) => {
+                  const plot = db.plots.find((p) => p.id === w.plotId);
+                  const farm = db.farms.find((f) => f.id === plot?.farmId);
+                  return (
+                    <tr key={w.id}>
+                      <Td>{fmtDate(w.date)}</Td>
+                      <Td>{farm?.name ?? "—"} · {plot?.name ?? "—"}</Td>
+                      <Td>{db.crops.find((c) => c.id === w.cropId)?.name ?? "—"}</Td>
+                      <Td right>{w.quantityKg.toLocaleString()} kg</Td>
+                      <Td><Badge tone="critical">{w.reason}</Badge></Td>
+                      <Td className="text-muted">{w.notes || "—"}</Td>
+                      <Td>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setWasteForm({ mode: "edit", waste: w })}
+                            className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteWaste(w)}
                             className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
                           >
                             Delete
@@ -417,6 +569,16 @@ export default function IncomePage() {
         />
       )}
       {saleForm && <SaleForm initial={saleForm} onClose={() => setSaleForm(null)} />}
+      {wasteForm && <WasteForm initial={wasteForm} onClose={() => setWasteForm(null)} />}
+      {deleteWaste && (
+        <ConfirmDialog
+          title="Delete this wastage record?"
+          message={`${deleteWaste.quantityKg.toLocaleString()} kg will go back into stock.`}
+          confirmLabel="Delete wastage"
+          onConfirm={() => doDeleteWaste(deleteWaste)}
+          onClose={() => setDeleteWaste(null)}
+        />
+      )}
     </div>
   );
 }
@@ -706,6 +868,116 @@ function SaleForm({ initial, onClose }: { initial: { cropId?: string; farmId?: s
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit}>Save Sale</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+const WASTE_REASONS: WasteReason[] = ["Rotten / spoiled", "Damaged", "Rejected by collector", "Own use / given away", "Other"];
+
+function WasteForm({
+  initial,
+  onClose,
+}: {
+  initial: { mode: "add"; cropId?: string; quantityKg?: number } | { mode: "edit"; waste: WasteRecord };
+  onClose: () => void;
+}) {
+  const { db, update } = useStore();
+  const waste = initial.mode === "edit" ? initial.waste : undefined;
+
+  // for a write-off started from a crop, suggest the plot that harvested the most of it
+  const defaultPlot = () => {
+    if (waste) return waste.plotId;
+    const cropId = initial.mode === "add" ? initial.cropId : undefined;
+    if (!cropId) return db.plots[0]?.id ?? "";
+    const kg = new Map<string, number>();
+    for (const h of db.harvests) if (h.cropId === cropId) kg.set(h.plotId, (kg.get(h.plotId) ?? 0) + h.quantityKg);
+    return [...kg.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? db.plots.find((p) => p.cropId === cropId)?.id ?? db.plots[0]?.id ?? "";
+  };
+  const firstPlot = defaultPlot();
+  const [form, setForm] = useState({
+    date: waste?.date ?? TODAY.toISOString().slice(0, 10),
+    plotId: firstPlot,
+    cropId: waste?.cropId ?? (initial.mode === "add" ? initial.cropId : undefined) ?? db.plots.find((p) => p.id === firstPlot)?.cropId ?? db.crops[0]?.id ?? "",
+    quantityKg: waste ? String(waste.quantityKg) : initial.mode === "add" && initial.quantityKg ? String(initial.quantityKg) : "",
+    reason: waste?.reason ?? ("Rotten / spoiled" as WasteReason),
+    notes: waste?.notes ?? "",
+  });
+
+  const qty = Number(form.quantityKg) || 0;
+  // an edited record's own kg are already out of stock, so give them back before comparing
+  const inStock = pendingStockKg(db, form.cropId) + (waste && waste.cropId === form.cropId ? waste.quantityKg : 0);
+
+  const submit = () => {
+    if (!qty || !form.plotId) return;
+    const payload = {
+      date: form.date,
+      plotId: form.plotId,
+      cropId: form.cropId,
+      quantityKg: qty,
+      reason: form.reason,
+      notes: form.notes.trim() || undefined,
+    };
+    if (waste) update("wastage", (list) => list.map((w) => (w.id === waste.id ? { ...w, ...payload } : w)));
+    else update("wastage", (list) => [...list, { id: newId("ws"), ...payload }]);
+    onClose();
+  };
+
+  return (
+    <Modal title={waste ? "Edit Wastage" : "Record Wastage"} onClose={onClose}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date">
+            <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          </Field>
+          <Field label="Quantity lost (kg)">
+            <TextInput type="number" value={form.quantityKg} onChange={(e) => setForm({ ...form, quantityKg: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Plot it came from">
+          <Select
+            value={form.plotId}
+            onChange={(e) => {
+              const p = db.plots.find((x) => x.id === e.target.value);
+              setForm({ ...form, plotId: e.target.value, cropId: p?.cropId ?? form.cropId });
+            }}
+          >
+            {db.plots.map((p) => (
+              <option key={p.id} value={p.id}>
+                {db.farms.find((f) => f.id === p.farmId)?.name} — {p.name} ({db.crops.find((c) => c.id === p.cropId)?.name})
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Crop">
+          <Select value={form.cropId} onChange={(e) => setForm({ ...form, cropId: e.target.value })}>
+            {db.crops.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Reason">
+          <Select value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value as WasteReason })}>
+            {WASTE_REASONS.map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Notes">
+          <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" />
+        </Field>
+        <p className={`text-xs ${qty > inStock ? "text-critical" : "text-muted"}`}>
+          {inStock.toLocaleString()} kg of this crop is in store (harvested − sold − written off).
+          {qty > inStock ? " This is more than the stock on record — check the harvest and sales records." : ""}
+        </p>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={submit}>{waste ? "Save changes" : "Save Wastage"}</Button>
         </div>
       </div>
     </Modal>

@@ -222,9 +222,14 @@ export function totalSoldKg(db: DB, cropId: string): number {
   return db.sales.filter((s) => s.cropId === cropId).reduce((s, x) => s + saleKg(x), 0);
 }
 
-/** Harvested but not yet sold, for a crop. Can go negative if oversold. */
+/** Total kg written off (rotten, damaged, given away...) for a crop. */
+export function totalWastedKg(db: DB, cropId: string): number {
+  return (db.wastage ?? []).filter((w) => w.cropId === cropId).reduce((s, w) => s + w.quantityKg, 0);
+}
+
+/** Harvested, not sold and not written off - what is still in the store. Can go negative if oversold. */
 export function pendingStockKg(db: DB, cropId: string): number {
-  return totalHarvestedKg(db, cropId) - totalSoldKg(db, cropId);
+  return totalHarvestedKg(db, cropId) - totalSoldKg(db, cropId) - totalWastedKg(db, cropId);
 }
 
 // ---------- Worker commission settings ----------

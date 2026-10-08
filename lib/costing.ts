@@ -39,7 +39,13 @@ export interface SeasonResult {
   totalCost: number;
   harvestedKg: number;
   soldKg: number;
+  /** Harvested, not sold and not written off - still in the store. */
   unsoldKg: number;
+  wastedKg: number;
+  /** Share of the season's cost sitting in produce that was written off. */
+  wasteCost: number;
+  /** Total cost spread over the kg actually sold. */
+  costPerSoldKg: number;
   revenue: number;
   avgPrice: number;
   unsoldValue: number;
@@ -153,6 +159,9 @@ export function seasonCosting(
     harvestedKg: 0,
     soldKg: 0,
     unsoldKg: 0,
+    wastedKg: 0,
+    wasteCost: 0,
+    costPerSoldKg: 0,
     revenue: 0,
     avgPrice: 0,
     unsoldValue: 0,
@@ -250,7 +259,11 @@ export function seasonCosting(
   const revenue = sales.reduce((s, x) => s + saleTotal(x), 0) * kgShare;
   const soldKg = sales.reduce((s, x) => s + saleKg(x), 0) * kgShare;
   const avgPrice = soldKg > 0 ? revenue / soldKg : 0;
-  const unsoldKg = Math.max(0, harvestedKg - soldKg);
+  const wastedKg = (db.wastage ?? [])
+    .filter((w) => w.plotId === plotId && w.cropId === cropId && inRange(w.date, from, to))
+    .reduce((s, w) => s + w.quantityKg, 0);
+  const unsoldKg = Math.max(0, harvestedKg - soldKg - wastedKg);
+  const costPerKg = harvestedKg > 0 ? totalCost / harvestedKg : 0;
   const profit = revenue - totalCost;
 
   return {
@@ -259,10 +272,13 @@ export function seasonCosting(
     harvestedKg,
     soldKg,
     unsoldKg,
+    wastedKg,
+    wasteCost: wastedKg * costPerKg,
+    costPerSoldKg: soldKg > 0 ? totalCost / soldKg : 0,
     revenue,
     avgPrice,
     unsoldValue: unsoldKg * avgPrice,
-    costPerKg: harvestedKg > 0 ? totalCost / harvestedKg : 0,
+    costPerKg,
     profit,
     profitPerKg: harvestedKg > 0 ? profit / harvestedKg : 0,
     margin: revenue > 0 ? profit / revenue : null,

@@ -305,6 +305,11 @@ export const seedDB: DB = {
     { id: "cl3", name: "Pasar Borong Selangor (demo)", phone: "000-000 0103", paymentTermDays: 2 },
   ],
 
+  // harvested produce that never reached a collector - the farm absorbs the cost
+  wastage: [
+    { id: "ws1", date: "2026-07-28", plotId: "p2", cropId: "c2", quantityKg: 40, reason: "Rotten / spoiled", notes: "Rain damage before pickup" },
+  ],
+
   sales: [
     {
       id: "s1", date: "2026-07-24", collectorId: "cl1", cropId: "c1", farmId: "f1",

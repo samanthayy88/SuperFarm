@@ -52,7 +52,11 @@ function load(): DB {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     // merge over the seed so saves made before a new collection existed still load
-    if (raw) return migrate({ ...seedDB, ...(JSON.parse(raw) as Partial<DB>) });
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<DB>;
+      // wastage is user-entered only: a save that predates it starts empty, not with the demo records
+      return migrate({ ...seedDB, ...saved, wastage: saved.wastage ?? [] });
+    }
   } catch {
     // corrupted save - fall back to the seed dataset
   }

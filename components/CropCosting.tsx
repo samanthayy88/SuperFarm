@@ -7,6 +7,7 @@ import { fmtRM, fmtRM0, fmtDate } from "@/lib/utils";
 import { COST_GROUPS, PlotSeason, SeasonResult, plotSeasons, seasonCosting } from "@/lib/costing";
 import { DB } from "@/lib/types";
 
+const kg0 = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 function plotLabel(db: DB, plotId: string) {
@@ -142,7 +143,7 @@ export default function CropCosting() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Total production cost" value={fmtRM0(res.totalCost)} sub="Workers + rent + utilities + inputs" />
-            <StatCard label="Harvested" value={`${harvested.toLocaleString()} kg`} sub={`${res.soldKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg sold`} />
+            <StatCard label="Harvested" value={`${harvested.toLocaleString()} kg`} sub={`${kg0(res.soldKg)} kg sold · ${kg0(res.unsoldKg)} in store · ${kg0(res.wastedKg)} written off`} />
             <StatCard label={`Production cost per kg ${cropName}`} value={harvested > 0 ? fmtRM(res.costPerKg) : "—"} sub="Total cost ÷ kg harvested" />
             <StatCard label="Revenue (sold)" value={fmtRM0(res.revenue)} sub={res.avgPrice > 0 ? `Avg ${fmtRM(res.avgPrice)}/kg` : "No sales in period"} />
           </div>
@@ -160,12 +161,34 @@ export default function CropCosting() {
             />
             <StatCard label="Profit margin" value={res.margin === null ? "—" : pct(res.margin)} sub="Profit ÷ revenue" />
             <StatCard
-              label="Unsold stock"
-              value={`${res.unsoldKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+              label="Unsold in store"
+              value={`${kg0(res.unsoldKg)} kg`}
               tone={unsold ? "warning" : undefined}
               sub={unsold && res.unsoldValue > 0 ? `≈ ${fmtRM0(res.unsoldValue)} more at avg price` : "Not yet in revenue"}
             />
           </div>
+
+          {(res.wastedKg > 0 || res.soldKg > 0) && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <StatCard
+                label="Written off (rotten / lost)"
+                value={`${kg0(res.wastedKg)} kg`}
+                tone={res.wastedKg > 0 ? "critical" : undefined}
+                sub={harvested > 0 ? `${pct(res.wastedKg / harvested)} of harvest` : undefined}
+              />
+              <StatCard
+                label="Cost absorbed on written-off produce"
+                value={fmtRM0(res.wasteCost)}
+                tone={res.wasteCost > 0 ? "critical" : undefined}
+                sub="Written-off kg × cost per kg — no income to cover it"
+              />
+              <StatCard
+                label="Cost per kg actually sold"
+                value={res.soldKg > 0 ? fmtRM(res.costPerSoldKg) : "—"}
+                sub="Total cost ÷ kg sold — your real break-even price"
+              />
+            </div>
+          )}
 
           <Card title={`Cost breakdown — ${cropName}, ${plotLabel(db, sel.plotId)}, ${fmtDate(sel.from)} to ${fmtDate(sel.to)}`}>
             <Table>
@@ -244,6 +267,8 @@ export default function CropCosting() {
                 <Th>Crop / season</Th>
                 <Th>Period</Th>
                 <Th right>Harvested</Th>
+                <Th right>Sold</Th>
+                <Th right>Unsold</Th>
                 <Th right>Total cost</Th>
                 <Th right>Cost / kg</Th>
                 <Th right>Revenue</Th>
@@ -262,6 +287,8 @@ export default function CropCosting() {
                       <Td className="font-semibold text-ink">{db.crops.find((c) => c.id === cid)?.name}</Td>
                       <Td className="text-xs text-muted">{group.length} season(s)</Td>
                       <Td right className="font-semibold">{kg.toLocaleString()} kg</Td>
+                      <Td right className="font-semibold">{kg0(group.reduce((s, x) => s + x.r.soldKg, 0))} kg</Td>
+                      <Td right className="font-semibold">{kg0(group.reduce((s, x) => s + x.r.harvestedKg - x.r.soldKg, 0))} kg</Td>
                       <Td right className="font-semibold">{fmtRM0(cost)}</Td>
                       <Td right className="font-semibold">{kg > 0 ? fmtRM(cost / kg) : "—"}</Td>
                       <Td right className="font-semibold">{fmtRM0(rev)}</Td>
@@ -287,6 +314,8 @@ export default function CropCosting() {
                           {fmtDate(s.start)} – {fmtDate(s.end)}
                         </Td>
                         <Td right>{r.harvestedKg.toLocaleString()} kg</Td>
+                        <Td right>{kg0(r.soldKg)} kg</Td>
+                        <Td right>{kg0(r.harvestedKg - r.soldKg)} kg</Td>
                         <Td right>{fmtRM0(r.totalCost)}</Td>
                         <Td right>{r.harvestedKg > 0 ? fmtRM(r.costPerKg) : "—"}</Td>
                         <Td right>{fmtRM0(r.revenue)}</Td>

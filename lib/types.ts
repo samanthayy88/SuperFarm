@@ -211,6 +211,20 @@ export interface HarvestRecord {
   commissionRate: number;
 }
 
+// ---------- Wastage (harvest that was never sold) ----------
+export type WasteReason = "Rotten / spoiled" | "Damaged" | "Rejected by collector" | "Own use / given away" | "Other";
+
+/** Harvested kg that left stock without being sold - the farm absorbs its cost. */
+export interface WasteRecord {
+  id: string;
+  date: string;
+  plotId: string;
+  cropId: string;
+  quantityKg: number;
+  reason: WasteReason;
+  notes?: string;
+}
+
 // ---------- Schedule ----------
 export interface ScheduleTask {
   id: string;
@@ -375,6 +389,7 @@ export interface DB {
   commissionSettings: WorkerCommissionSetting[];
   harvestTargets: WorkerHarvestTarget[];
   harvests: HarvestRecord[];
+  wastage: WasteRecord[];
   tasks: ScheduleTask[];
   collectors: Collector[];
   sales: SaleRecord[];
