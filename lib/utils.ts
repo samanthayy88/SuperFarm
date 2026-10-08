@@ -10,6 +10,7 @@ import {
   PLOT_STAGES,
   PLOT_STAGE_LABELS,
   WorkerHarvestTarget,
+  WorkerCommissionSetting,
   Purchase,
 } from "./types";
 
@@ -240,13 +241,21 @@ export function pendingStockKg(db: DB, cropId: string): number {
  * is never consulted again for past harvests, so a later change here can't
  * rewrite commission, payroll or payslip history.
  */
-export function commissionRateFor(db: DB, workerId: string, cropId: string, variety?: string): number {
+export function commissionSourceFor(
+  db: DB,
+  workerId: string,
+  cropId: string,
+  variety?: string
+): { rate: number; setting?: WorkerCommissionSetting } {
   const settings = db.commissionSettings.filter((s) => s.workerId === workerId && s.cropId === cropId);
   const exact = variety ? settings.find((s) => s.variety === variety) : undefined;
-  const anyVariety = settings.find((s) => !s.variety);
-  const match = exact ?? anyVariety;
-  if (match) return match.ratePerKg;
-  return db.crops.find((c) => c.id === cropId)?.commissionRatePerKg ?? 0;
+  const match = exact ?? settings.find((s) => !s.variety);
+  if (match) return { rate: match.ratePerKg, setting: match };
+  return { rate: db.crops.find((c) => c.id === cropId)?.commissionRatePerKg ?? 0 };
+}
+
+export function commissionRateFor(db: DB, workerId: string, cropId: string, variety?: string): number {
+  return commissionSourceFor(db, workerId, cropId, variety).rate;
 }
 
 // ---------- Worker harvest targets ----------

@@ -19,7 +19,7 @@ import {
   StatCard,
   Tabs,
 } from "@/components/ui";
-import { fmtRM, fmtDate, harvestTargetActualKg } from "@/lib/utils";
+import { fmtRM, fmtDate, harvestTargetActualKg, commissionSourceFor } from "@/lib/utils";
 import { Worker, WorkerCommissionSetting, WorkerHarvestTarget } from "@/lib/types";
 import GroupedBarChart, { GroupedBarDatum } from "@/components/GroupedBarChart";
 import VarietySelect from "@/components/VarietySelect";
@@ -302,11 +302,18 @@ function CommissionSettingsTab() {
               <Th>Crop</Th>
               <Th>Variety</Th>
               <Th right>Rate (RM/kg)</Th>
+              <Th right>Harvest records</Th>
+              <Th right>Commission earned</Th>
               <Th />
             </tr>
           </thead>
           <tbody>
             {db.commissionSettings.map((s) => {
+              // harvests this setting governs: the ones that resolve to it when recorded
+              const linked = db.harvests.filter(
+                (h) => commissionSourceFor(db, h.workerId, h.cropId, h.variety).setting?.id === s.id
+              );
+              const earned = linked.reduce((sum, h) => sum + h.quantityKg * h.commissionRate, 0);
               const worker = db.workers.find((w) => w.id === s.workerId)?.name ?? "—";
               const crop = db.crops.find((c) => c.id === s.cropId)?.name ?? "—";
               return (
@@ -315,6 +322,8 @@ function CommissionSettingsTab() {
                   <Td>{crop}</Td>
                   <Td>{s.variety || <span className="text-muted">Any</span>}</Td>
                   <Td right>RM {s.ratePerKg.toFixed(2)}</Td>
+                  <Td right>{linked.length}</Td>
+                  <Td right>{fmtRM(earned)}</Td>
                   <Td>
                     <div className="flex gap-1">
                       <button

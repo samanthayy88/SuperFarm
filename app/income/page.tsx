@@ -24,6 +24,7 @@ import {
   fmtRM0,
   fmtDate,
   commissionRateFor,
+  commissionSourceFor,
   currentMonthKey,
   monthLabel,
   lastNMonthKeys,
@@ -446,7 +447,8 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
   const qty = Number(form.quantityKg) || 0;
   const rate = Number(form.commissionRate) || 0;
   const commission = qty * rate;
-  const currentSettingRate = worker && crop ? commissionRateFor(db, worker.id, crop.id, form.variety || undefined) : 0;
+  const source = worker && crop ? commissionSourceFor(db, worker.id, crop.id, form.variety || undefined) : null;
+  const currentSettingRate = source?.rate ?? 0;
 
   // plot/variety changing means the worker and/or crop may have changed too, so refresh the suggested
   // rate to match — but this never touches an existing harvest's rate unless the user then saves
@@ -542,9 +544,25 @@ function HarvestForm({ harvest, onClose }: { harvest?: HarvestRecord; onClose: (
             onChange={(e) => setForm({ ...form, commissionRate: e.target.value })}
           />
         </Field>
+        {source && (
+          <p className={`text-xs ${source.setting ? "text-good" : "text-warning"}`}>
+            {source.setting ? (
+              <>
+                ✓ Linked to Commission Settings — {worker?.name} · {crop?.name} · {source.setting.variety || "any variety"}: RM{" "}
+                {source.rate.toFixed(2)}/kg
+              </>
+            ) : (
+              <>
+                No Commission Setting for {worker?.name} on {crop?.name}
+                {form.variety ? ` (${form.variety})` : ""} — using the crop&apos;s default RM {source.rate.toFixed(2)}/kg. Add one
+                under My Workers › Commission Settings.
+              </>
+            )}
+          </p>
+        )}
         {Math.abs(rate - currentSettingRate) > 0.001 && (
           <p className="text-xs text-muted">
-            Current Commission Setting for this worker/crop/variety is RM {currentSettingRate.toFixed(2)}/kg.{" "}
+            This differs from the {source?.setting ? "Commission Setting" : "default"} rate of RM {currentSettingRate.toFixed(2)}/kg.{" "}
             <button
               type="button"
               onClick={() => setForm({ ...form, commissionRate: String(currentSettingRate) })}
