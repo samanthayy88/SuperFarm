@@ -75,6 +75,7 @@ export default function PaymentPage() {
                 <Th>Date</Th>
                 <Th>Category</Th>
                 <Th>Payee</Th>
+                <Th>Farm</Th>
                 <Th>Description</Th>
                 <Th right>Amount</Th>
                 <Th />
@@ -86,6 +87,7 @@ export default function PaymentPage() {
                   <Td>{fmtDate(p.date)}</Td>
                   <Td>{p.category}</Td>
                   <Td>{p.payee}</Td>
+                  <Td>{db.farms.find((f) => f.id === p.farmId)?.name ?? <span className="text-muted">All farms</span>}</Td>
                   <Td>{p.description}</Td>
                   <Td right className="font-medium">{fmtRM(p.amount)}</Td>
                   <Td>
@@ -108,7 +110,7 @@ export default function PaymentPage() {
               ))}
               <tr>
                 <Td className="font-semibold">Total</Td>
-                <Td /><Td /><Td />
+                <Td /><Td /><Td /><Td />
                 <Td right className="font-semibold">{fmtRM(totalSpent)}</Td>
                 <Td />
               </tr>
@@ -134,7 +136,7 @@ export default function PaymentPage() {
 }
 
 function PaymentForm({ payment, onClose }: { payment?: Payment; onClose: () => void }) {
-  const { update } = useStore();
+  const { db, update } = useStore();
   const editing = Boolean(payment);
   const [form, setForm] = useState({
     date: payment?.date ?? new Date().toISOString().slice(0, 10),
@@ -142,6 +144,7 @@ function PaymentForm({ payment, onClose }: { payment?: Payment; onClose: () => v
     payee: payment?.payee ?? "",
     description: payment?.description ?? "",
     amount: payment ? String(payment.amount) : "",
+    farmId: payment?.farmId ?? "",
     notes: payment?.notes ?? "",
   });
 
@@ -153,6 +156,7 @@ function PaymentForm({ payment, onClose }: { payment?: Payment; onClose: () => v
       payee: form.payee.trim(),
       description: form.description.trim(),
       amount: Number(form.amount) || 0,
+      farmId: form.farmId || undefined,
       notes: form.notes.trim() || undefined,
     };
     if (payment) {
@@ -189,6 +193,16 @@ function PaymentForm({ payment, onClose }: { payment?: Payment; onClose: () => v
         </Field>
         <Field label="Amount (RM)">
           <TextInput type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+        </Field>
+        <Field label="Farm (for crop costing)">
+          <Select value={form.farmId} onChange={(e) => setForm({ ...form, farmId: e.target.value })}>
+            <option value="">All farms (company-wide)</option>
+            {db.farms.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Notes">
           <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

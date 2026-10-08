@@ -15,6 +15,7 @@ import {
   computePayroll,
   averageCycleDaysByCrop,
 } from "@/lib/utils";
+import CropCosting from "@/components/CropCosting";
 import BarChart from "@/components/BarChart";
 import GroupedBarChart from "@/components/GroupedBarChart";
 
@@ -38,13 +39,14 @@ export default function DataAnalysisPage() {
         title="Data & Analysis"
         subtitle="Cross-farm, financial, worker and application-cost analytics, rolled up from every record in the dashboard"
         actions={
-          tab !== "Farm Analysis" ? (
+          tab !== "Farm Analysis" && tab !== "Costing by Crop" ? (
             <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
           ) : undefined
         }
       />
-      <Tabs tabs={["Farm Analysis", "Financial Analysis", "Worker Analysis", "Application Analysis"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["Farm Analysis", "Costing by Crop", "Financial Analysis", "Worker Analysis", "Application Analysis"]} active={tab} onChange={setTab} />
       {tab === "Farm Analysis" && <FarmAnalysis />}
+      {tab === "Costing by Crop" && <CropCosting />}
       {tab === "Financial Analysis" && <FinancialAnalysis month={month} />}
       {tab === "Worker Analysis" && <WorkerAnalysis month={month} />}
       {tab === "Application Analysis" && <ApplicationAnalysis month={month} />}

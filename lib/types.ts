@@ -321,6 +321,8 @@ export interface Payment {
   payee: string;
   description: string;
   amount: number;
+  /** Farm this bill belongs to, for crop costing. Blank = company-wide (spread over all farms). */
+  farmId?: string;
   notes?: string;
 }
 
