@@ -133,7 +133,16 @@ export default function IncomePage() {
   const balanceNow = db.crops
     .filter((c) => !stockCrop || c.id === stockCrop)
     .reduce((s, c) => s + pendingStockKg(db, c.id), 0);
-  const allToday = stockLedger(db, today, today).rows;
+
+  // ---- Today: what was picked and sold, and what it earned ----
+  const todayHarvests = db.harvests.filter((h) => h.date === today);
+  const todaySales = db.sales.filter((x) => x.date === today);
+  const todayRevenue = todaySales.reduce((s, x) => s + saleTotal(x), 0);
+  const todayHarvestKg = todayHarvests.reduce((s, h) => s + h.quantityKg, 0);
+  const todaySaleKg = todaySales.reduce((s, x) => s + saleKg(x), 0);
+  const todayCommission = todayHarvests.reduce((s, h) => s + h.quantityKg * h.commissionRate, 0);
+  const stockNow = db.crops.reduce((s, c) => s + pendingStockKg(db, c.id), 0);
+  const [showOverview, setShowOverview] = useState(false);
 
   const doDeleteWaste = (w: WasteRecord) => {
     update("wastage", (list) => list.filter((x) => x.id !== w.id));
@@ -168,6 +177,128 @@ export default function IncomePage() {
         }
       />
 
+      <Card
+        title={`Today — ${new Date().toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
+        className="mb-6"
+        actions={
+          <div className="flex gap-2">
+            <Button small onClick={() => setHarvestForm({ mode: "add" })}>+ Record Harvest</Button>
+            <Button small variant="ghost" onClick={() => setSaleForm({})}>+ Record Sale</Button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Harvested today" value={`${todayHarvestKg.toLocaleString()} kg`} sub={`${todayHarvests.length} record(s) · ${fmtRM(todayCommission)} commission`} />
+          <StatCard label="Sold today" value={`${todaySaleKg.toLocaleString()} kg`} sub={`${todaySales.length} sale(s)`} tone={todaySaleKg > 0 ? "good" : undefined} />
+          <StatCard
+            label="Revenue today"
+            value={fmtRM(todayRevenue)}
+            sub={todaySaleKg > 0 ? `Avg ${fmtRM(todayRevenue / todaySaleKg)}/kg` : "No sales yet today"}
+            tone={todayRevenue > 0 ? "good" : undefined}
+          />
+          <StatCard
+            label="Balance in store now"
+            value={`${stockNow.toLocaleString()} kg`}
+            sub="Harvested − sold − written off"
+            tone={stockNow < 0 ? "critical" : stockNow > 0 ? "warning" : "good"}
+          />
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div>
+            <p className="mb-2 text-sm font-semibold text-ink">Today&apos;s harvest</p>
+            {todayHarvests.length === 0 ? (
+              <EmptyState message="Nothing harvested yet today." />
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Worker</Th>
+                    <Th>Farm / Plot</Th>
+                    <Th>Crop</Th>
+                    <Th right>Quantity</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todayHarvests.map((h) => {
+                    const plot = db.plots.find((x) => x.id === h.plotId);
+                    return (
+                      <tr key={h.id}>
+                        <Td>{db.workers.find((w) => w.id === h.workerId)?.name ?? "—"}</Td>
+                        <Td>{db.farms.find((f) => f.id === plot?.farmId)?.name ?? "—"} · {plot?.name ?? "—"}</Td>
+                        <Td>{db.crops.find((c) => c.id === h.cropId)?.name ?? "—"}</Td>
+                        <Td right>{h.quantityKg.toLocaleString()} kg</Td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <Td className="font-semibold">Total</Td>
+                    <Td /><Td />
+                    <Td right className="font-semibold">{todayHarvestKg.toLocaleString()} kg</Td>
+                  </tr>
+                </tbody>
+              </Table>
+            )}
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-ink">Today&apos;s sales</p>
+            {todaySales.length === 0 ? (
+              <EmptyState message="Nothing sold yet today." />
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Collector</Th>
+                    <Th>Crop</Th>
+                    <Th right>Quantity</Th>
+                    <Th right>Amount</Th>
+                    <Th>Payment</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todaySales.map((x) => (
+                    <tr key={x.id}>
+                      <Td>{db.collectors.find((c) => c.id === x.collectorId)?.name ?? "—"}</Td>
+                      <Td>{db.crops.find((c) => c.id === x.cropId)?.name ?? "—"}</Td>
+                      <Td right>{saleKg(x).toLocaleString()} kg</Td>
+                      <Td right>{fmtRM(saleTotal(x))}</Td>
+                      <Td><Badge tone={x.paymentStatus === "Received" ? "good" : "warning"}>{x.paymentStatus}</Badge></Td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <Td className="font-semibold">Total</Td>
+                    <Td />
+                    <Td right className="font-semibold">{todaySaleKg.toLocaleString()} kg</Td>
+                    <Td right className="font-semibold">{fmtRM(todayRevenue)}</Td>
+                    <Td />
+                  </tr>
+                </tbody>
+              </Table>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="All-time overview"
+        className="mb-6"
+        actions={
+          <Button small variant="ghost" onClick={() => setShowOverview((v) => !v)}>
+            {showOverview ? "Hide details" : "Show details"}
+          </Button>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-2">
+          <span>Harvested <strong className="text-ink">{vol.harvested.toLocaleString()} kg</strong></span>
+          <span>Sold <strong className="text-good">{vol.sold.toLocaleString()} kg</strong></span>
+          <span>Unsold <strong className="text-warning">{unsold.toLocaleString()} kg</strong> ({vol.inStock.toLocaleString()} in store · {vol.wasted.toLocaleString()} written off)</span>
+          <span>Receivables <strong className={receivables > 0 ? "text-warning" : "text-ink"}>{fmtRM0(receivables)}</strong></span>
+          {overdue.length > 0 && <Badge tone="critical">{overdue.length} overdue payment(s)</Badge>}
+        </div>
+      </Card>
+
+      {showOverview && (
+        <div className="mb-6">
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total harvested" value={`${vol.harvested.toLocaleString()} kg`} sub="All time, all crops" />
         <StatCard label="Total sold" value={`${vol.sold.toLocaleString()} kg`} sub={pctOf(vol.sold)} tone="good" />
@@ -247,19 +378,14 @@ export default function IncomePage() {
             </tbody>
           </Table>
         )}
-        <p className="mt-3 text-sm text-ink-2">
-          <span className="font-medium text-ink">Today ({fmtDate(today)}):</span>{" "}
-          {allToday.reduce((s, r) => s + r.harvestedKg, 0).toLocaleString()} kg harvested ·{" "}
-          {allToday.reduce((s, r) => s + r.soldKg, 0).toLocaleString()} kg sold · {vol.inStock.toLocaleString()} kg balance in store
-          <button onClick={() => setTab("Daily Stock")} className="ml-2 text-accent hover:underline">
-            See daily stock
-          </button>
-        </p>
-        <p className="mt-2 text-xs text-muted">
+        <p className="mt-3 text-xs text-muted">
           Unsold = harvested − sold. It is either still in the store or written off (rotten, damaged, given away). Written-off
           produce earns no income but its growing cost stays in the farm&apos;s books — see Data &amp; Analysis › Costing by Crop.
         </p>
       </Card>
+
+        </div>
+      )}
 
       <Tabs tabs={["Harvest Records", "Sales", "Daily Stock", "Wastage", "Average Price by Crop", "Collector Payments"]} active={tab} onChange={setTab} />
 
