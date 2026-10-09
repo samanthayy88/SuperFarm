@@ -12,10 +12,10 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        <h1 className="text-3xl font-medium tracking-tight text-ink sm:text-4xl">{title}</h1>
+        {subtitle && <p className="mt-2 max-w-3xl text-base text-ink-2">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -38,12 +38,12 @@ export function Card({
       className={`rounded-card border border-hairline bg-surface shadow-card ${className}`}
     >
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
-          {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-5 py-4">
+          {title && <h2 className="text-base font-medium text-ink">{title}</h2>}
           {actions}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
@@ -68,10 +68,10 @@ export function StatCard({
           ? "text-critical"
           : "text-ink";
   return (
-    <div className="rounded-card border border-hairline bg-surface p-4 shadow-card">
-      <p className="text-xs font-medium tracking-wide text-muted">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold tnum ${toneClass}`}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
+    <div className="rounded-card border border-hairline bg-surface p-5 shadow-card">
+      <p className="text-sm text-ink-2">{label}</p>
+      <p className={`mt-3 text-3xl font-medium tracking-tight tnum ${toneClass}`}>{value}</p>
+      {sub && <p className="mt-1.5 text-xs text-muted">{sub}</p>}
     </div>
   );
 }
@@ -147,18 +147,19 @@ export function Button({
   type?: "button" | "submit";
   small?: boolean;
 }) {
-  const base = small ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
+  const base = small ? "px-3.5 py-1.5 text-xs" : "px-5 py-2.5 text-sm";
+  // filled periwinkle pill for the main action, outlined pill for the rest (as the "Try for free" / "Request demo" pair)
   const style =
     variant === "primary"
-      ? "bg-solid text-on-solid hover:bg-solid-hover"
+      ? "border border-accent bg-accent text-on-accent hover:bg-accent-hover hover:border-accent-hover"
       : variant === "danger"
-        ? "bg-critical-soft text-critical hover:brightness-95"
-        : "border border-hairline bg-surface text-ink-2 hover:bg-surface-2 hover:text-ink";
+        ? "border border-transparent bg-critical-soft text-critical hover:brightness-95"
+        : "border border-accent/40 bg-transparent text-accent hover:bg-accent-soft";
   return (
     <button
       type={type}
       onClick={onClick}
-      className={`rounded-lg font-medium transition-colors ${base} ${style}`}
+      className={`rounded-full font-medium transition-colors ${base} ${style}`}
     >
       {children}
     </button>
@@ -186,7 +187,7 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-hairline px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <h3 className="text-base font-medium text-ink">{title}</h3>
           <button
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink"
@@ -211,7 +212,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none";
+  "w-full rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputClass} />;
@@ -244,7 +245,7 @@ export function WorkerMultiSelect({
             aria-checked={on}
             onClick={() => toggle(w.id)}
             className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-              on ? "border-ink bg-ink text-white" : "border-hairline bg-surface text-ink-2 hover:bg-surface-2"
+              on ? "border-accent bg-accent text-on-accent" : "border-hairline bg-surface text-ink-2 hover:bg-surface-2"
             }`}
           >
             {on ? "✓ " : ""}
@@ -271,7 +272,7 @@ export function MonthSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-sm font-medium text-ink"
+      className="rounded-full border border-hairline bg-surface px-4 py-2 text-sm font-medium text-ink"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>{o.label}</option>
@@ -295,15 +296,15 @@ export function Tabs({
   onChange: (t: string) => void;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-surface-2 p-1">
+    <div className="mb-6 flex flex-wrap gap-2">
       {tabs.map((t) => (
         <button
           key={t}
           onClick={() => onChange(t)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
             active === t
-              ? "bg-chip-active text-ink shadow-card"
-              : "text-muted hover:text-ink"
+              ? "border-accent bg-accent text-on-accent"
+              : "border-hairline bg-surface text-ink-2 hover:border-accent/40 hover:text-accent"
           }`}
         >
           {t}

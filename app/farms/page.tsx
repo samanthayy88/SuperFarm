@@ -315,13 +315,13 @@ export default function FarmsPage() {
                             <div className="flex gap-1">
                               <button
                                 onClick={() => setPlotForm({ mode: "edit", plot: p })}
-                                className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                                className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => setDeletePlot(p)}
-                                className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                                className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
                               >
                                 Delete
                               </button>
@@ -568,13 +568,13 @@ function FarmHistoryModal({ farm, onClose }: { farm: Farm; onClose: () => void }
                     <div className="flex gap-1">
                       <button
                         onClick={() => setEditRow(row)}
-                        className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                        className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setDeleteRow(row)}
-                        className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                        className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
                       >
                         Delete
                       </button>

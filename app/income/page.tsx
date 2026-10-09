@@ -357,7 +357,7 @@ export default function IncomePage() {
                           setWasteForm({ mode: "add", cropId: r.crop.id, quantityKg: r.inStock });
                           setTab("Wastage");
                         }}
-                        className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                        className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                       >
                         Write off
                       </button>
@@ -432,19 +432,19 @@ export default function IncomePage() {
                               setSaleForm({ cropId: h.cropId, farmId: farm?.id });
                               setTab("Sales");
                             }}
-                            className="rounded-md border border-hairline px-2 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
+                            className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
                           >
                             Sell
                           </button>
                           <button
                             onClick={() => setHarvestForm({ mode: "edit", harvest: h })}
-                            className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                            className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => setDeleteHarvest(h)}
-                            className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                            className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
                           >
                             Delete
                           </button>
@@ -573,13 +573,13 @@ export default function IncomePage() {
                         <div className="flex gap-1">
                           <button
                             onClick={() => setWasteForm({ mode: "edit", waste: w })}
-                            className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                            className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => setDeleteWaste(w)}
-                            className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                            className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
                           >
                             Delete
                           </button>

@@ -16,7 +16,7 @@ const MoonIcon = () => (
 );
 
 /** Segmented light/dark control, styled after ClickUp's pill toggles. */
-export default function ThemeToggle({ compact = false }: { compact?: boolean }) {
+export default function ThemeToggle({ compact = false, onNav = false }: { compact?: boolean; onNav?: boolean }) {
   const { theme, setTheme } = useTheme();
 
   const item = (value: "light" | "dark", label: string, icon: React.ReactNode) => {
@@ -29,7 +29,13 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
         aria-label={`${label} mode`}
         title={`${label} mode`}
         className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
-          active ? "bg-chip-active text-ink shadow-card" : "text-muted hover:text-ink-2"
+          active
+            ? onNav
+              ? "bg-white/15 text-nav-ink"
+              : "bg-chip-active text-ink shadow-card"
+            : onNav
+              ? "text-nav-muted hover:text-nav-ink"
+              : "text-muted hover:text-ink-2"
         }`}
       >
         {icon}
@@ -39,7 +45,7 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
   };
 
   return (
-    <div className="flex items-center gap-0.5 rounded-full bg-surface-2 p-0.5" role="group" aria-label="Colour theme">
+    <div className={`flex items-center gap-0.5 rounded-full p-0.5 ${onNav ? "bg-nav-hover" : "bg-surface-2"}`} role="group" aria-label="Colour theme">
       {item("light", "Light", <SunIcon />)}
       {item("dark", "Dark", <MoonIcon />)}
     </div>

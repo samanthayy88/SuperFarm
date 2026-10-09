@@ -118,13 +118,13 @@ export default function CropVarietyPage() {
                           <div className="flex gap-1">
                             <button
                               onClick={() => setVarietyForm({ cropId: crop.id, mode: "edit", variety: v })}
-                              className="rounded-md border border-hairline px-2 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                              className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => setDeleteVariety(v)}
-                              className="rounded-md px-2 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                              className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
                             >
                               Delete
                             </button>

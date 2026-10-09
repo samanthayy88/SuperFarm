@@ -8,34 +8,41 @@
    `var(--…)` rather than a baked-in hex. That is what lets a single
    `data-theme` attribute on <html> restyle the whole app.
 
-   Colours are adapted from ClickUp's public design tokens; the status and
-   muted steps were darkened/lightened from theirs so every text-on-background
-   pairing clears WCAG AA (4.5:1) at small sizes.
+   Look and feel follows supermetrics.com: a warm near-black ink, a single
+   periwinkle accent, a deep-navy panel colour for the sidebar, pill-shaped
+   controls and generously rounded cards. Text and accent pairings are kept
+   at WCAG AA (4.5:1) for small sizes.
 --------------------------------------------------------------------------- */
 
 :root,
 :root[data-theme="light"] {
-  --page: #f7f8fa;
+  --page: #f5f5f7;
   --surface: #ffffff;
-  --surface-2: #f1f2f4;
-  --surface-3: #e9eaed;
+  --surface-2: #f2f2f6;
+  --surface-3: #e8e8ef;
 
-  --ink: #202020;
-  --ink-2: #646464;
-  --muted: #6e6e6e;
+  --ink: #1e1d1b;
+  --ink-2: #55544f;
+  --muted: #6c6b66;
 
-  --hairline: #e8e8e8;
-  --grid: #f0f1f3;
+  --hairline: #e5e5ec;
+  --grid: #efeff4;
 
-  --accent: #6647f0;
-  --accent-hover: #563bd6;
-  --accent-soft: #efedfd;
+  --accent: #5558f4;
+  --accent-hover: #4447e0;
+  --accent-soft: #f0f0ff;
   --on-accent: #ffffff;
 
-  /* near-black primary button, the way ClickUp does it */
-  --solid: #202020;
-  --solid-hover: #000000;
+  --solid: #25254a;
+  --solid-hover: #1a1a38;
   --on-solid: #ffffff;
+
+  /* sidebar: deep navy panel, white text, accent pill for the current page */
+  --nav-bg: #25254a;
+  --nav-ink: #ffffff;
+  --nav-muted: #a9a9cc;
+  --nav-hover: rgba(255, 255, 255, 0.08);
+  --nav-line: rgba(255, 255, 255, 0.12);
 
   --good: #05752f;
   --good-soft: #e2f8ec;
@@ -46,43 +53,49 @@
   --critical: #b8251c;
   --critical-soft: #fbdddd;
 
-  --chart-1: #6647f0;
-  --chart-1-hover: #8163f5;
-  --chart-2: #0e9488;
-  --chart-2-hover: #12b3a3;
-  --chart-axis: #d6d7db;
-  --chart-grid: #eceef1;
+  --chart-1: #5558f4;
+  --chart-1-hover: #7b7eff;
+  --chart-2: #f0605b;
+  --chart-2-hover: #ff7f7a;
+  --chart-axis: #d9d9e2;
+  --chart-grid: #ececf2;
 
   /* raised chip inside a segmented control */
   --chip-active: #ffffff;
 
-  --shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 0 0 1px rgba(16, 16, 20, 0.03);
-  --shadow-pop: 0 12px 32px rgba(16, 16, 20, 0.14), 0 2px 8px rgba(16, 16, 20, 0.08);
-  --scrollbar: #d3d4d8;
+  --shadow-card: 0 1px 2px rgba(30, 29, 27, 0.04), 0 8px 24px rgba(37, 37, 74, 0.04);
+  --shadow-pop: 0 16px 40px rgba(37, 37, 74, 0.2), 0 2px 8px rgba(37, 37, 74, 0.1);
+  --scrollbar: #cfcfdb;
 }
 
 :root[data-theme="dark"] {
-  --page: #141417;
-  --surface: #1c1c21;
-  --surface-2: #26262c;
-  --surface-3: #303039;
+  --page: #0f0f1f;
+  --surface: #181833;
+  --surface-2: #21213f;
+  --surface-3: #2b2b4d;
 
-  --ink: #f5f5f7;
-  --ink-2: #b4b4bd;
-  --muted: #8a8a94;
+  --ink: #f4f4fa;
+  --ink-2: #bcbcd6;
+  --muted: #9a9ab8;
 
-  --hairline: rgba(255, 255, 255, 0.09);
+  --hairline: rgba(255, 255, 255, 0.1);
   --grid: rgba(255, 255, 255, 0.06);
 
-  --accent: #8b7cf6;
-  --accent-hover: #9d90f8;
-  --accent-soft: rgba(163, 150, 255, 0.16);
-  --on-accent: #16131f;
+  --accent: #9092ff;
+  --accent-hover: #a5a7ff;
+  --accent-soft: rgba(144, 146, 255, 0.16);
+  --on-accent: #12122a;
 
   /* inverted in dark: a light chip reads as "primary" against the dark page */
-  --solid: #f5f5f7;
+  --solid: #f4f4fa;
   --solid-hover: #ffffff;
-  --on-solid: #1c1c21;
+  --on-solid: #181833;
+
+  --nav-bg: #14142b;
+  --nav-ink: #f4f4fa;
+  --nav-muted: #9a9ab8;
+  --nav-hover: rgba(255, 255, 255, 0.07);
+  --nav-line: rgba(255, 255, 255, 0.1);
 
   --good: #3ecf7f;
   --good-soft: rgba(62, 207, 127, 0.16);
@@ -93,19 +106,19 @@
   --critical: #ff6b6b;
   --critical-soft: rgba(255, 107, 107, 0.16);
 
-  --chart-1: #8b7cf6;
-  --chart-1-hover: #a396ff;
-  --chart-2: #2dd4bf;
-  --chart-2-hover: #5eead4;
-  --chart-axis: #3a3a44;
-  --chart-grid: #2a2a31;
+  --chart-1: #9092ff;
+  --chart-1-hover: #b0b2ff;
+  --chart-2: #ff7f7a;
+  --chart-2-hover: #ff9b97;
+  --chart-axis: #3a3a5c;
+  --chart-grid: #2a2a48;
 
   /* lighter than the track in dark, so the chip still reads as raised */
-  --chip-active: #3a3a44;
+  --chip-active: #3a3a5c;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
-  --scrollbar: #3a3a44;
+  --scrollbar: #3a3a5c;
 }
 
 @theme inline {
@@ -131,6 +144,12 @@
   --color-solid-hover: var(--solid-hover);
   --color-on-solid: var(--on-solid);
 
+  --color-nav: var(--nav-bg);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-hover: var(--nav-hover);
+  --color-nav-line: var(--nav-line);
+
   --color-good: var(--good);
   --color-good-soft: var(--good-soft);
   --color-warning: var(--warning);
@@ -143,7 +162,7 @@
   --shadow-card: var(--shadow-card);
   --shadow-pop: var(--shadow-pop);
 
-  --radius-card: 0.75rem;
+  --radius-card: 1rem;
 }
 
 html {
@@ -156,8 +175,16 @@ html[data-theme="dark"] {
 body {
   background: var(--page);
   color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Neue Haas Grotesk is what supermetrics.com uses; Helvetica Neue is its closest system match */
+  font-family: "Helvetica Neue", Helvetica, "Segoe UI", Arial, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* tight, medium-weight headings, as on supermetrics.com */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 
 /* Theme swap should feel like a swap, not an animation of every element. */

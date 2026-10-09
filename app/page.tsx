@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { PageHeader, Card, StatCard, Badge, Table, Th, Td, EmptyState, MonthSelect } from "@/components/ui";
+import { Card, StatCard, Badge, Table, Th, Td, EmptyState, MonthSelect } from "@/components/ui";
 import BarChart from "@/components/BarChart";
 import {
   fmtRM,
@@ -112,11 +112,34 @@ export default function Overview() {
 
   return (
     <div>
-      <PageHeader
-        title="Overview"
-        subtitle={`${TODAY.toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${db.farms.length} farms · ${db.plots.length} plots`}
-        actions={<MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />}
-      />
+      <section className="mb-8 rounded-card bg-nav p-6 text-nav-ink shadow-card sm:p-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <p className="text-sm text-nav-muted">
+            {TODAY.toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+        </div>
+        <h1 className="mt-4 max-w-2xl text-4xl font-medium tracking-tight sm:text-5xl">
+          Your farms, <span className="text-[#a5a7ff]">at a glance</span>
+        </h1>
+        <p className="mt-4 max-w-xl text-base text-nav-muted">
+          {db.farms.length} farms and {db.plots.length} plots — harvests, sales, costs and what needs your attention, in one view.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/income"
+            className="rounded-full bg-accent px-6 py-3 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
+          >
+            Today&apos;s harvest &amp; sales
+          </Link>
+          <Link
+            href="/data-analysis"
+            className="rounded-full border border-white/30 px-6 py-3 text-sm font-medium text-nav-ink transition-colors hover:bg-nav-hover"
+          >
+            Data &amp; Analysis
+          </Link>
+        </div>
+      </section>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label={`Sales — ${monthLabel(month)}`} value={fmtRM0(monthRevenue)} sub={`${monthSales.length} sales recorded`} />
