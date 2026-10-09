@@ -16,6 +16,14 @@ import {
 
 export const TODAY = new Date();
 
+/** Today's date as the user's calendar shows it (local time), as "YYYY-MM-DD". */
+export function todayLocalISO(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 export function fmtRM(n: number) {
   return `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -411,4 +419,51 @@ export function averageCycleDaysByCrop(plots: Plot[], cropId: string): number | 
 export function workerNames(db: DB, ids: string[] | undefined): string {
   const names = (ids ?? []).map((id) => db.workers.find((w) => w.id === id)?.name).filter(Boolean);
   return names.length ? names.join(", ") : "—";
+}
+
+// ---------- Daily stock ledger ----------
+
+export interface StockDay {
+  date: string;
+  cropId: string;
+  harvestedKg: number;
+  soldKg: number;
+  wastedKg: number;
+  /** In store at the end of this day (harvested − sold − written off, from the beginning). */
+  balanceKg: number;
+}
+
+/**
+ * Day-by-day harvested / sold / written-off volume with a running balance per
+ * crop, for days that had any movement in [from, to]. Computed straight from
+ * the records, so it is always current.
+ */
+export function stockLedger(db: DB, from: string, to: string, cropId?: string): { rows: StockDay[]; opening: number } {
+  const ok = (c: string) => !cropId || c === cropId;
+  type Move = { h: number; s: number; w: number };
+  const byCrop = new Map<string, Map<string, Move>>(); // crop -> date -> movement
+  const mv = (c: string, d: string) => {
+    const days = byCrop.get(c) ?? new Map<string, Move>();
+    byCrop.set(c, days);
+    const m = days.get(d) ?? { h: 0, s: 0, w: 0 };
+    days.set(d, m);
+    return m;
+  };
+  for (const h of db.harvests) if (ok(h.cropId)) mv(h.cropId, h.date).h += h.quantityKg;
+  for (const s of db.sales) if (ok(s.cropId)) mv(s.cropId, s.date).s += saleKg(s);
+  for (const w of db.wastage ?? []) if (ok(w.cropId)) mv(w.cropId, w.date).w += w.quantityKg;
+
+  const rows: StockDay[] = [];
+  let opening = 0; // stock in store the day before `from`, all crops in view
+  for (const [crop, days] of byCrop) {
+    let bal = 0;
+    for (const d of [...days.keys()].sort()) {
+      const m = days.get(d)!;
+      bal += m.h - m.s - m.w;
+      if (d < from) opening += m.h - m.s - m.w;
+      else if (d <= to) rows.push({ date: d, cropId: crop, harvestedKg: m.h, soldKg: m.s, wastedKg: m.w, balanceKg: bal });
+    }
+  }
+  rows.sort((a, b) => b.date.localeCompare(a.date) || a.cropId.localeCompare(b.cropId));
+  return { rows, opening };
 }

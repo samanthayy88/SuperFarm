@@ -36,6 +36,8 @@ import {
   totalHarvestedKg,
   totalSoldKg,
   totalWastedKg,
+  stockLedger,
+  todayLocalISO,
   TODAY,
 } from "@/lib/utils";
 import { HarvestRecord, SaleRecord, SaleGradeLine, WasteRecord, WasteReason } from "@/lib/types";
@@ -113,6 +115,25 @@ export default function IncomePage() {
   );
   const unsold = vol.harvested - vol.sold; // everything not sold: still in store + written off
   const pctOf = (n: number) => (vol.harvested > 0 ? `${((n / vol.harvested) * 100).toFixed(1)}% of harvest` : "—");
+
+  // ---- Daily stock: movement and running balance, straight from the records ----
+  const today = todayLocalISO();
+  const daysAgo = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const [stockCrop, setStockCrop] = useState("");
+  const [stockFrom, setStockFrom] = useState(() => daysAgo(30));
+  const [stockTo, setStockTo] = useState(today);
+  const ledger = stockLedger(db, stockFrom, stockTo, stockCrop || undefined);
+  const todayMoves = stockLedger(db, today, today, stockCrop || undefined).rows;
+  const todayHarvested = todayMoves.reduce((s, r) => s + r.harvestedKg, 0);
+  const todaySold = todayMoves.reduce((s, r) => s + r.soldKg, 0);
+  const balanceNow = db.crops
+    .filter((c) => !stockCrop || c.id === stockCrop)
+    .reduce((s, c) => s + pendingStockKg(db, c.id), 0);
+  const allToday = stockLedger(db, today, today).rows;
 
   const doDeleteWaste = (w: WasteRecord) => {
     update("wastage", (list) => list.filter((x) => x.id !== w.id));
@@ -226,13 +247,21 @@ export default function IncomePage() {
             </tbody>
           </Table>
         )}
-        <p className="mt-3 text-xs text-muted">
+        <p className="mt-3 text-sm text-ink-2">
+          <span className="font-medium text-ink">Today ({fmtDate(today)}):</span>{" "}
+          {allToday.reduce((s, r) => s + r.harvestedKg, 0).toLocaleString()} kg harvested ·{" "}
+          {allToday.reduce((s, r) => s + r.soldKg, 0).toLocaleString()} kg sold · {vol.inStock.toLocaleString()} kg balance in store
+          <button onClick={() => setTab("Daily Stock")} className="ml-2 text-accent hover:underline">
+            See daily stock
+          </button>
+        </p>
+        <p className="mt-2 text-xs text-muted">
           Unsold = harvested − sold. It is either still in the store or written off (rotten, damaged, given away). Written-off
           produce earns no income but its growing cost stays in the farm&apos;s books — see Data &amp; Analysis › Costing by Crop.
         </p>
       </Card>
 
-      <Tabs tabs={["Harvest Records", "Sales", "Wastage", "Average Price by Crop", "Collector Payments"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["Harvest Records", "Sales", "Daily Stock", "Wastage", "Average Price by Crop", "Collector Payments"]} active={tab} onChange={setTab} />
 
       {tab === "Harvest Records" && (
         <Card title={`Harvest records — ${monthLabel(month)}`}>
@@ -302,6 +331,87 @@ export default function IncomePage() {
             </Table>
           )}
         </Card>
+      )}
+
+      {tab === "Daily Stock" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard label={`Harvested today — ${fmtDate(today)}`} value={`${todayHarvested.toLocaleString()} kg`} />
+            <StatCard label="Sold today" value={`${todaySold.toLocaleString()} kg`} tone={todaySold > 0 ? "good" : undefined} />
+            <StatCard
+              label="Balance in store now"
+              value={`${balanceNow.toLocaleString()} kg`}
+              tone={balanceNow < 0 ? "critical" : balanceNow > 0 ? "warning" : "good"}
+              sub="Harvested − sold − written off"
+            />
+          </div>
+          <Card title="Daily harvested, sold and balance">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <Field label="Crop">
+                <Select value={stockCrop} onChange={(e) => setStockCrop(e.target.value)}>
+                  <option value="">All crops</option>
+                  {db.crops.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="From">
+                <TextInput type="date" value={stockFrom} onChange={(e) => setStockFrom(e.target.value)} />
+              </Field>
+              <Field label="To">
+                <TextInput type="date" value={stockTo} onChange={(e) => setStockTo(e.target.value)} />
+              </Field>
+              <div className="flex items-end gap-2">
+                <Button small variant="ghost" onClick={() => { setStockFrom(daysAgo(7)); setStockTo(today); }}>7 days</Button>
+                <Button small variant="ghost" onClick={() => { setStockFrom(daysAgo(30)); setStockTo(today); }}>30 days</Button>
+                <Button small variant="ghost" onClick={() => { setStockFrom(daysAgo(90)); setStockTo(today); }}>90 days</Button>
+              </div>
+            </div>
+            {ledger.rows.length === 0 ? (
+              <EmptyState message="No harvests, sales or write-offs in this period." />
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Date</Th>
+                    <Th>Crop</Th>
+                    <Th right>Harvested</Th>
+                    <Th right>Sold</Th>
+                    <Th right>Written off</Th>
+                    <Th right>Balance in store</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.rows.map((r) => (
+                    <tr key={`${r.date}-${r.cropId}`}>
+                      <Td>{fmtDate(r.date)}{r.date === today && <span className="ml-2 text-xs text-accent">today</span>}</Td>
+                      <Td>{db.crops.find((c) => c.id === r.cropId)?.name ?? "—"}</Td>
+                      <Td right>{r.harvestedKg ? `${r.harvestedKg.toLocaleString()} kg` : "—"}</Td>
+                      <Td right>{r.soldKg ? `${r.soldKg.toLocaleString()} kg` : "—"}</Td>
+                      <Td right>{r.wastedKg ? <span className="text-critical">{r.wastedKg.toLocaleString()} kg</span> : "—"}</Td>
+                      <Td right className={`font-medium ${r.balanceKg < 0 ? "text-critical" : ""}`}>{r.balanceKg.toLocaleString()} kg</Td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <Td className="font-semibold">Period total</Td>
+                    <Td />
+                    <Td right className="font-semibold">{ledger.rows.reduce((s, r) => s + r.harvestedKg, 0).toLocaleString()} kg</Td>
+                    <Td right className="font-semibold">{ledger.rows.reduce((s, r) => s + r.soldKg, 0).toLocaleString()} kg</Td>
+                    <Td right className="font-semibold">{ledger.rows.reduce((s, r) => s + r.wastedKg, 0).toLocaleString()} kg</Td>
+                    <Td />
+                  </tr>
+                </tbody>
+              </Table>
+            )}
+            <p className="mt-3 text-xs text-muted">
+              Only days with a harvest, sale or write-off are listed. The balance is per crop and carries over from earlier
+              days (stock before {fmtDate(stockFrom)}: {ledger.opening.toLocaleString()} kg). It updates the moment you save a
+              record.
+            </p>
+          </Card>
+        </div>
       )}
 
       {tab === "Wastage" && (

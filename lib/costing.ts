@@ -1,5 +1,5 @@
 import { DB, Plot, PlotCycle, PLOT_STAGES } from "./types";
-import { applicationCost, saleKg, saleTotal } from "./utils";
+import { applicationCost, saleKg, saleTotal, todayLocalISO } from "./utils";
 
 /**
  * Production costing by crop season.
@@ -88,10 +88,6 @@ function monthsCovered(from: string, to: string): number {
   return total;
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 // ---------- seasons ----------
 
 function cycleStart(cycle: PlotCycle): string | null {
@@ -102,7 +98,7 @@ function cycleStart(cycle: PlotCycle): string | null {
 /** Every crop season on record: each plot's current cycle plus its archived ones. */
 export function plotSeasons(db: DB): PlotSeason[] {
   const out: PlotSeason[] = [];
-  const today = todayISO();
+  const today = todayLocalISO();
   for (const p of db.plots) {
     const start = cycleStart(p.cycle ?? {});
     if (start) {
@@ -147,11 +143,19 @@ function acreShare(plot: Plot, pool: Plot[]): number {
   return total > 0 && pool.some((p) => p.id === plot.id) ? plot.sizeAcres / total : 0;
 }
 
+/** Rent accrued by a farm's contracts over [from, to] - per day under contract, whether or not paid yet. */
+function farmRent(db: DB, farmId: string, from: string, to: string): number {
+  return db.contracts
+    .filter((c) => c.farmId === farmId)
+    .reduce((s, c) => s + (overlapDays(from, to, c.startDate, c.endDate) * c.monthlyRent * 12) / 365, 0);
+}
+
 export function seasonCosting(
   db: DB,
-  opts: { plotId: string; cropId: string; from: string; to: string; workerIds?: string[] }
+  opts: { plotId: string; /** Omit to count every crop on the plot. */ cropId?: string; from: string; to: string; workerIds?: string[] }
 ): SeasonResult {
   const { plotId, cropId, from, to } = opts;
+  const cropOk = (c: string) => !cropId || c === cropId;
   const plot = db.plots.find((p) => p.id === plotId);
   const empty: SeasonResult = {
     lines: [],
@@ -177,7 +181,7 @@ export function seasonCosting(
   const add = (group: CostGroup, label: string, amount: number, basis: string) => lines.push({ group, label, amount, basis });
 
   // ---- Workers ----
-  const harvests = db.harvests.filter((h) => h.plotId === plotId && h.cropId === cropId && inRange(h.date, from, to));
+  const harvests = db.harvests.filter((h) => h.plotId === plotId && cropOk(h.cropId) && inRange(h.date, from, to));
   const harvestedKg = harvests.reduce((s, h) => s + h.quantityKg, 0);
   add(
     "Workers",
@@ -206,11 +210,8 @@ export function seasonCosting(
   add("Workers", "Other worker expenses (not deducted from pay)", otherWorkerExp, "Allocated by acreage across each worker's plots");
 
   // ---- Land rental (accrued per day the farm was under contract) ----
-  const farm = db.farms.find((f) => f.id === plot.farmId);
-  const farmAcres = Math.max(farm?.sizeAcres ?? 0, farmPlots.reduce((s, p) => s + p.sizeAcres, 0));
-  const rent = db.contracts
-    .filter((c) => c.farmId === plot.farmId)
-    .reduce((s, c) => s + (overlapDays(from, to, c.startDate, c.endDate) * c.monthlyRent * 12) / 365, 0);
+  const farmAcres = Math.max(db.farms.find((f) => f.id === plot.farmId)?.sizeAcres ?? 0, farmPlots.reduce((s, p) => s + p.sizeAcres, 0));
+  const rent = farmRent(db, plot.farmId, from, to);
   add("Land rental", "Land rent", farmAcres > 0 ? (rent * plot.sizeAcres) / farmAcres : 0, "Allocated by plot's share of farm acreage");
 
   // ---- Utilities & overheads (Expenses > Payment, plus non-stock purchases) ----
@@ -252,15 +253,15 @@ export function seasonCosting(
   // ---- Revenue: farm's sales of this crop, split between plots by share of kg harvested ----
   const plotById = new Map(db.plots.map((p) => [p.id, p]));
   const farmCropKg = db.harvests
-    .filter((h) => plotById.get(h.plotId)?.farmId === plot.farmId && h.cropId === cropId && inRange(h.date, from, to))
+    .filter((h) => plotById.get(h.plotId)?.farmId === plot.farmId && cropOk(h.cropId) && inRange(h.date, from, to))
     .reduce((s, h) => s + h.quantityKg, 0);
   const kgShare = farmCropKg > 0 ? harvestedKg / farmCropKg : 0;
-  const sales = db.sales.filter((s) => s.farmId === plot.farmId && s.cropId === cropId && inRange(s.date, from, to));
+  const sales = db.sales.filter((s) => s.farmId === plot.farmId && cropOk(s.cropId) && inRange(s.date, from, to));
   const revenue = sales.reduce((s, x) => s + saleTotal(x), 0) * kgShare;
   const soldKg = sales.reduce((s, x) => s + saleKg(x), 0) * kgShare;
   const avgPrice = soldKg > 0 ? revenue / soldKg : 0;
   const wastedKg = (db.wastage ?? [])
-    .filter((w) => w.plotId === plotId && w.cropId === cropId && inRange(w.date, from, to))
+    .filter((w) => w.plotId === plotId && cropOk(w.cropId) && inRange(w.date, from, to))
     .reduce((s, w) => s + w.quantityKg, 0);
   const unsoldKg = Math.max(0, harvestedKg - soldKg - wastedKg);
   const costPerKg = harvestedKg > 0 ? totalCost / harvestedKg : 0;
@@ -282,5 +283,134 @@ export function seasonCosting(
     profit,
     profitPerKg: harvestedKg > 0 ? profit / harvestedKg : 0,
     margin: revenue > 0 ? profit / revenue : null,
+  };
+}
+
+// ---------- whole-farm costing ----------
+
+export interface FarmCropRow {
+  cropId: string;
+  plots: string[];
+  harvestedKg: number;
+  soldKg: number;
+  revenue: number;
+  /** Cost of the plot-seasons this crop ran in (clipped to the period). */
+  cost: number;
+  costPerKg: number;
+  profit: number;
+}
+
+export interface FarmResult {
+  lines: CostLine[];
+  totalCost: number;
+  harvestedKg: number;
+  soldKg: number;
+  wastedKg: number;
+  unsoldKg: number;
+  revenue: number;
+  profit: number;
+  margin: number | null;
+  costPerKg: number;
+  acres: number;
+  profitPerAcre: number;
+  crops: FarmCropRow[];
+  /** Cost not tied to a crop season: land lying fallow, gaps between crops, undated cycles. */
+  idleCost: number;
+}
+
+/**
+ * Profit and loss for one farm over [from, to], every crop together. Costs are
+ * the sum of its plots' costs, except land rent, which is the farm's whole
+ * rent - so fallow or unplanted land still weighs on the farm's result.
+ */
+export function farmCosting(db: DB, opts: { farmId: string; from: string; to: string }): FarmResult {
+  const { farmId, from, to } = opts;
+  const plots = db.plots.filter((p) => p.farmId === farmId);
+  const plotIds = new Set(plots.map((p) => p.id));
+  const farm = db.farms.find((f) => f.id === farmId);
+  const acres = Math.max(farm?.sizeAcres ?? 0, plots.reduce((s, p) => s + p.sizeAcres, 0));
+
+  const merged = new Map<string, CostLine>();
+  if (from <= to) {
+    for (const p of plots) {
+      for (const l of seasonCosting(db, { plotId: p.id, from, to }).lines) {
+        const key = `${l.group}|${l.label}`;
+        const cur = merged.get(key);
+        if (cur) cur.amount += l.amount;
+        else merged.set(key, { ...l });
+      }
+    }
+  }
+  const rentKey = "Land rental|Land rent";
+  const rentLine = merged.get(rentKey);
+  const rent = from <= to ? farmRent(db, farmId, from, to) : 0;
+  if (rentLine) {
+    rentLine.amount = rent;
+    rentLine.basis = "Whole farm rent, including land not planted";
+  } else merged.set(rentKey, { group: "Land rental", label: "Land rent", amount: rent, basis: "Whole farm rent, including land not planted" });
+  const lines = [...merged.values()];
+  const totalCost = lines.reduce((s, l) => s + l.amount, 0);
+
+  const harvests = db.harvests.filter((h) => plotIds.has(h.plotId) && inRange(h.date, from, to));
+  const sales = db.sales.filter((s) => s.farmId === farmId && inRange(s.date, from, to));
+  const harvestedKg = harvests.reduce((s, h) => s + h.quantityKg, 0);
+  const soldKg = sales.reduce((s, x) => s + saleKg(x), 0);
+  const revenue = sales.reduce((s, x) => s + saleTotal(x), 0);
+  const wastedKg = (db.wastage ?? []).filter((w) => plotIds.has(w.plotId) && inRange(w.date, from, to)).reduce((s, w) => s + w.quantityKg, 0);
+  const profit = revenue - totalCost;
+
+  // crops planted in the period, each with the plots it ran on and the cost of its (clipped) seasons
+  const cropIds = new Set<string>(harvests.map((h) => h.cropId));
+  const seasons = plotSeasons(db).filter((s) => s.farmId === farmId && s.start <= to && s.end >= from);
+  const costByCrop = new Map<string, number>();
+  const plotsByCrop = new Map<string, Set<string>>();
+  for (const s of seasons) {
+    cropIds.add(s.cropId);
+    const f = s.start > from ? s.start : from;
+    const t = s.end < to ? s.end : to;
+    const c = seasonCosting(db, { plotId: s.plotId, cropId: s.cropId, from: f, to: t, workerIds: s.workerIds }).totalCost;
+    costByCrop.set(s.cropId, (costByCrop.get(s.cropId) ?? 0) + c);
+    const names = plotsByCrop.get(s.cropId) ?? new Set<string>();
+    names.add(db.plots.find((p) => p.id === s.plotId)?.name ?? "—");
+    plotsByCrop.set(s.cropId, names);
+  }
+  for (const h of harvests) {
+    const names = plotsByCrop.get(h.cropId) ?? new Set<string>();
+    names.add(db.plots.find((p) => p.id === h.plotId)?.name ?? "—");
+    plotsByCrop.set(h.cropId, names);
+  }
+  const crops: FarmCropRow[] = [...cropIds].map((cropId) => {
+    const hk = harvests.filter((h) => h.cropId === cropId).reduce((s, h) => s + h.quantityKg, 0);
+    const cs = sales.filter((x) => x.cropId === cropId);
+    const rev = cs.reduce((s, x) => s + saleTotal(x), 0);
+    const cost = costByCrop.get(cropId) ?? 0;
+    return {
+      cropId,
+      plots: [...(plotsByCrop.get(cropId) ?? [])],
+      harvestedKg: hk,
+      soldKg: cs.reduce((s, x) => s + saleKg(x), 0),
+      revenue: rev,
+      cost,
+      costPerKg: hk > 0 ? cost / hk : 0,
+      profit: rev - cost,
+    };
+  });
+  crops.sort((a, b) => b.revenue - a.revenue || b.harvestedKg - a.harvestedKg);
+
+  return {
+    lines,
+    totalCost,
+    harvestedKg,
+    soldKg,
+    wastedKg,
+    unsoldKg: Math.max(0, harvestedKg - soldKg - wastedKg),
+    revenue,
+    profit,
+    margin: revenue > 0 ? profit / revenue : null,
+    costPerKg: harvestedKg > 0 ? totalCost / harvestedKg : 0,
+    acres,
+    profitPerAcre: acres > 0 ? profit / acres : 0,
+    crops,
+    idleCost: totalCost - crops.reduce((s, c) => s + c.cost, 0),
   };
 }
