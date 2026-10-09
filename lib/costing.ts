@@ -239,14 +239,21 @@ export function seasonCosting(
     .filter((a) => a.plotId === plotId && inRange(a.date, from, to))
     .reduce((s, a) => s + applicationCost(a), 0);
   add("Farm inputs", "Spray rounds (pesticides, fungicides, foliar)", sprays, "Direct (logged against this plot)");
+  // consumables are charged when used; tools and materials are not used up, so they are charged when handed to the farm
+  const durable = (cat?: string) => cat === "Tools" || cat === "Materials";
   const stockUsed = db.usageLogs
     .filter((u) => inRange(u.date, from, to))
     .reduce((s, u) => {
       const item = db.items.find((i) => i.id === u.itemId);
+      if (durable(item?.category)) return s;
       const pool = u.farmId ? db.plots.filter((p) => p.farmId === u.farmId) : db.plots;
       return s + u.quantity * (item?.lastCostPerUnit ?? 0) * acreShare(plot, pool);
     }, 0);
   add("Farm inputs", "Fertilizer & other stock used", stockUsed, "Allocated by acreage (farm chosen on the usage log)");
+  const toolsAllocated = (db.allocations ?? [])
+    .filter((al) => al.farmId === plot.farmId && inRange(al.date, from, to) && durable(db.items.find((i) => i.id === al.itemId)?.category))
+    .reduce((s, al) => s + al.quantity * al.unitCost, 0);
+  add("Farm inputs", "Tools & materials given to the farm", toolsAllocated * acreShare(plot, farmPlots), "Allocated by acreage (charged when stock is allocated to the farm)");
 
   const totalCost = lines.reduce((s, l) => s + l.amount, 0);
 

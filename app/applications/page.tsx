@@ -5,6 +5,7 @@ import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, applicationCost, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { ApplicationRecord, ApplicationProduct } from "@/lib/types";
+import { consumeStock, farmBalance, mainBalance, fmtStock } from "@/lib/stock";
 
 export default function ApplicationsPage() {
   const { db } = useStore();
@@ -243,10 +244,11 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
     };
     update("applications", (list) => [...list, a]);
     // deduct the mixed quantity from stock
+    // the farm's own share of each item is used first; any shortfall comes out of Main
     update("items", (list) =>
       list.map((item) => {
         const used = valid.filter((p) => p.itemId === item.id).reduce((s, p) => s + p.quantityUsed, 0);
-        return used > 0 ? { ...item, stock: Math.max(0, Number((item.stock - used).toFixed(3))) } : item;
+        return used > 0 ? consumeStock(item, form.farmId, used) : item;
       })
     );
     onClose();
@@ -357,7 +359,20 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
                   >
                     ✕
                   </button>
-                  {item && <span className="col-span-6 -mt-1 text-xs text-muted">Stock: {item.stock} {item.unit}</span>}
+                  {item && (() => {
+                    const own = farmBalance(item, form.farmId);
+                    const short = Math.max(0, p.quantityUsed - own);
+                    const farmName = db.farms.find((f) => f.id === form.farmId)?.name ?? "this farm";
+                    return (
+                      <span className={`col-span-6 -mt-1 text-xs ${short > mainBalance(item) ? "text-critical" : short > 0 ? "text-warning" : "text-muted"}`}>
+                        {farmName}: {fmtStock(item, own)} · Main: {fmtStock(item, mainBalance(item))}
+                        {short > 0 && p.quantityUsed > 0 &&
+                          (short > mainBalance(item)
+                            ? ` — not enough stock (short by ${(short - mainBalance(item)).toLocaleString()} ${item.unit})`
+                            : ` — ${short.toLocaleString()} ${item.unit} will be drawn from Main`)}
+                      </span>
+                    );
+                  })()}
                 </div>
               );
             })}

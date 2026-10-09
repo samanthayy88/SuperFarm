@@ -408,58 +408,61 @@ export const seedDB: DB = {
 
   items: [
     {
-      id: "i1", name: "NPK 15-15-15", category: "Fertilizer", unit: "bag (50kg)",
-      stock: 14, minStock: 10, lastCostPerUnit: 145, trackInventory: true,
+      id: "i1", name: "NPK 15-15-15", category: "Fertilizer", unit: "kg", packSize: 50, packLabel: "bag",
+      stock: 700, minStock: 500, lastCostPerUnit: 2.9, trackInventory: true,
+      farmStock: { f1: 200, f2: 150 },
       aliases: [
         { supplierId: "sp1", aliasName: "Baja NPK Hijau 15:15:15 50KG" },
         { supplierId: "sp2", aliasName: "KH Compound 15-15-15" },
       ],
     },
     {
-      id: "i2", name: "Chicken Manure (processed)", category: "Fertilizer", unit: "bag (25kg)",
-      stock: 6, minStock: 20, lastCostPerUnit: 18, trackInventory: true,
+      id: "i2", name: "Chicken Manure (processed)", category: "Fertilizer", unit: "kg", packSize: 25, packLabel: "bag",
+      stock: 150, minStock: 500, lastCostPerUnit: 0.72, trackInventory: true,
       aliases: [
         { supplierId: "sp2", aliasName: "Organic Poultry Compost 25KG" },
         { supplierId: "sp3", aliasName: "Baja Tahi Ayam Proses" },
       ],
     },
     {
-      id: "i3", name: "Abamectin 1.8EC (insecticide)", category: "Pesticide", unit: "bottle (1L)",
+      id: "i3", name: "Abamectin 1.8EC (insecticide)", category: "Pesticide", unit: "L", packSize: 1, packLabel: "bottle",
       stock: 3, minStock: 4, lastCostPerUnit: 68, trackInventory: true,
+      farmStock: { f1: 1 },
       aliases: [
         { supplierId: "sp1", aliasName: "Agro-Mectin 1.8 EC 1L" },
         { supplierId: "sp3", aliasName: "Abamektin 18g/L" },
       ],
     },
     {
-      id: "i4", name: "Mancozeb 80WP (fungicide)", category: "Fungicide", unit: "pack (1kg)",
+      id: "i4", name: "Mancozeb 80WP (fungicide)", category: "Fungicide", unit: "kg", packSize: 1, packLabel: "pack",
       stock: 8, minStock: 5, lastCostPerUnit: 32, trackInventory: true,
       aliases: [
         { supplierId: "sp1", aliasName: "Manzate 80 WP 1KG" },
       ],
     },
     {
-      id: "i5", name: "Glyphosate 41% (herbicide)", category: "Herbicide", unit: "bottle (4L)",
-      stock: 5, minStock: 3, lastCostPerUnit: 85, trackInventory: true,
+      id: "i5", name: "Glyphosate 41% (herbicide)", category: "Herbicide", unit: "L", packSize: 4, packLabel: "bottle",
+      stock: 20, minStock: 12, lastCostPerUnit: 21.25, trackInventory: true,
       aliases: [
         { supplierId: "sp3", aliasName: "Racun Rumpai Glifosat 41 4L" },
       ],
     },
     {
-      id: "i6", name: "Foliar Fertilizer (high K)", category: "Fertilizer", unit: "bottle (1L)",
+      id: "i6", name: "Foliar Fertilizer (high K)", category: "Fertilizer", unit: "L", packSize: 1, packLabel: "bottle",
       stock: 0, minStock: 4, lastCostPerUnit: 42, trackInventory: true,
       aliases: [
         { supplierId: "sp2", aliasName: "KH Foliar Boost K+" },
       ],
     },
     {
-      id: "i7", name: "Trellis Netting", category: "Materials", unit: "roll",
+      id: "i7", name: "Trellis Netting", category: "Materials", unit: "roll", packSize: 1,
       stock: 4, minStock: 2, lastCostPerUnit: 55, trackInventory: true,
       aliases: [{ supplierId: "sp3", aliasName: "Jaring Junjung 100m" }],
     },
     {
-      id: "i8", name: "Harvest Crates", category: "Tools", unit: "pcs",
+      id: "i8", name: "Harvest Crates", category: "Tools", unit: "pcs", packSize: 1,
       stock: 38, minStock: 30, lastCostPerUnit: 12, trackInventory: true,
+      farmStock: { f1: 12, f2: 8 },
       aliases: [{ supplierId: "sp3", aliasName: "Bakul Plastik Besar" }],
     },
   ],
@@ -506,10 +509,19 @@ export const seedDB: DB = {
     { id: "pm4", date: "2026-06-10", category: "Bank Charges", payee: "Maybank", description: "Account maintenance + cheque book", amount: 35 },
   ],
 
+  // stock handed from the main store to individual farms (the demo split of NPK, abamectin and crates)
+  allocations: [
+    { id: "al1", date: "2026-07-06", itemId: "i1", farmId: "f1", quantity: 200, unitCost: 2.9, kind: "transfer" },
+    { id: "al2", date: "2026-07-06", itemId: "i1", farmId: "f2", quantity: 150, unitCost: 2.9, kind: "transfer" },
+    { id: "al3", date: "2026-07-13", itemId: "i3", farmId: "f1", quantity: 1, unitCost: 68, kind: "transfer" },
+    { id: "al4", date: "2026-07-19", itemId: "i8", farmId: "f1", quantity: 12, unitCost: 12, kind: "transfer" },
+    { id: "al5", date: "2026-07-19", itemId: "i8", farmId: "f2", quantity: 8, unitCost: 12, kind: "transfer" },
+  ],
+
   usageLogs: [
-    { id: "u1", date: "2026-07-08", itemId: "i1", quantity: 3, purpose: "Side dressing - Plot A/B", farmId: "f1" },
-    { id: "u2", date: "2026-07-15", itemId: "i2", quantity: 12, purpose: "Base fertilizer new beds", farmId: "f3" },
-    { id: "u3", date: "2026-07-21", itemId: "i5", quantity: 1, purpose: "Weed control farm paths", farmId: "f2" },
+    { id: "u1", date: "2026-07-08", itemId: "i1", quantity: 150, purpose: "Side dressing - Plot A/B", farmId: "f1" },
+    { id: "u2", date: "2026-07-15", itemId: "i2", quantity: 300, purpose: "Base fertilizer new beds", farmId: "f3" },
+    { id: "u3", date: "2026-07-21", itemId: "i5", quantity: 4, purpose: "Weed control farm paths", farmId: "f2" },
     { id: "u4", date: "2026-07-26", itemId: "i6", quantity: 4, purpose: "Foliar spray chili", farmId: "f1" },
   ],
 

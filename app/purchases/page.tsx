@@ -2,13 +2,15 @@
 
 import { useState, useRef } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, MonthSelect, EmptyState } from "@/components/ui";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, MonthSelect, EmptyState, ConfirmDialog } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, purchaseTotal, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
-import { Purchase, PurchaseLine } from "@/lib/types";
+import { Purchase, PurchaseLine, StockAllocation } from "@/lib/types";
+import { packSizeOf, fmtStock } from "@/lib/stock";
 
 export default function PurchasesPage() {
-  const { db, update } = useStore();
+  const { db, update, setDB } = useStore();
   const [showPurchase, setShowPurchase] = useState(false);
+  const [deletePurchase, setDeletePurchase] = useState<Purchase | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const months = lastNMonthKeys(12).reverse();
   const [month, setMonth] = useState(
@@ -22,6 +24,43 @@ export default function PurchasesPage() {
   const totalSpend = db.purchases.reduce((s, p) => s + purchaseTotal(p), 0);
   const monthPurchases = db.purchases.filter((p) => p.date.startsWith(month));
   const monthVendors = new Set(monthPurchases.map((p) => p.supplierId)).size;
+
+  /** Removing a purchase takes back what it added: the stock, and each farm's share of it. */
+  const doDeletePurchase = (p: Purchase) => {
+    setDB((prev) => {
+      const mine = (prev.allocations ?? []).filter((a) => a.purchaseId === p.id);
+      return {
+        ...prev,
+        purchases: prev.purchases.filter((x) => x.id !== p.id),
+        allocations: (prev.allocations ?? []).filter((a) => a.purchaseId !== p.id),
+        items: prev.items.map((item) => {
+          const added = p.lines.filter((l) => l.itemId === item.id).reduce((s, l) => s + l.quantity * packSizeOf(item), 0);
+          if (added === 0) return item;
+          const farmStock = { ...(item.farmStock ?? {}) };
+          for (const a of mine.filter((x) => x.itemId === item.id))
+            farmStock[a.farmId] = Math.max(0, Number(((farmStock[a.farmId] ?? 0) - a.quantity).toFixed(3)));
+          return { ...item, stock: Math.max(0, Number((item.stock - added).toFixed(3))), farmStock };
+        }),
+      };
+    });
+    setDeletePurchase(null);
+  };
+
+  /** "Chicken Manure: Sungai Ruan 10 kg · Bukit Tinggi 5 kg · Main 10 kg" for each stocked line of a purchase. */
+  const splitSummary = (p: Purchase): string[] => {
+    const out: string[] = [];
+    const itemIds = [...new Set(p.lines.map((l) => l.itemId).filter(Boolean) as string[])];
+    for (const id of itemIds) {
+      const item = db.items.find((i) => i.id === id);
+      if (!item) continue;
+      const received = p.lines.filter((l) => l.itemId === id).reduce((s, l) => s + l.quantity * packSizeOf(item), 0);
+      const splits = (db.allocations ?? []).filter((a) => a.purchaseId === p.id && a.itemId === id);
+      const given = splits.reduce((s, a) => s + a.quantity, 0);
+      const parts = splits.map((a) => `${db.farms.find((f) => f.id === a.farmId)?.name ?? "Farm"} ${a.quantity.toLocaleString()} ${item.unit}`);
+      out.push(`${item.name}: ${[...parts, `Main ${Math.max(0, received - given).toLocaleString()} ${item.unit}`].join(" · ")}`);
+    }
+    return out;
+  };
 
   const setClaimStatus = (id: string, status: Purchase["claimStatus"]) =>
     update("purchases", (list) => list.map((p) => (p.id === id ? { ...p, claimStatus: status } : p)));
@@ -60,6 +99,7 @@ export default function PurchasesPage() {
               <Th>Paid by</Th>
               <Th>Claim status</Th>
               <Th>Receipt</Th>
+              <Th />
             </tr>
           </thead>
           <tbody>
@@ -76,13 +116,16 @@ export default function PurchasesPage() {
                         <p key={idx} className="text-xs text-ink-2">
                           {l.invoiceName} × {l.quantity} @ {fmtRM(l.unitPrice)}
                           {item ? (
-                            <span className="ml-1 text-accent">→ {item.name}</span>
+                            <span className="ml-1 text-accent">→ {item.name} (+{fmtStock(item, l.quantity * packSizeOf(item))})</span>
                           ) : (
                             <span className="ml-1 text-muted">(one-time, not stocked)</span>
                           )}
                         </p>
                       );
                     })}
+                    {splitSummary(p).map((line) => (
+                      <p key={line} className="mt-1 text-xs text-muted">{line}</p>
+                    ))}
                   </Td>
                   <Td right className="font-medium">{fmtRM(purchaseTotal(p))}</Td>
                   <Td>
@@ -116,6 +159,14 @@ export default function PurchasesPage() {
                       <span className="text-xs text-critical">Missing</span>
                     )}
                   </Td>
+                  <Td>
+                    <button
+                      onClick={() => setDeletePurchase(p)}
+                      className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                    >
+                      Delete
+                    </button>
+                  </Td>
                 </tr>
               );
             })}
@@ -125,6 +176,15 @@ export default function PurchasesPage() {
       </Card>
 
       {showPurchase && <PurchaseForm onClose={() => setShowPurchase(false)} />}
+      {deletePurchase && (
+        <ConfirmDialog
+          title="Delete this purchase?"
+          message={`The ${fmtRM(purchaseTotal(deletePurchase))} purchase will be removed, and the stock it added (and each farm's share of it) is taken back out of inventory.`}
+          confirmLabel="Delete purchase"
+          onConfirm={() => doDeletePurchase(deletePurchase)}
+          onClose={() => setDeletePurchase(null)}
+        />
+      )}
       {receiptPreview && (
         <Modal title="Receipt" onClose={() => setReceiptPreview(null)} wide>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,12 +195,19 @@ export default function PurchasesPage() {
   );
 }
 
+interface DraftSplit {
+  key: string;
+  farmId: string;
+  quantity: string; // base units (kg / L / pcs)
+}
+
 interface DraftLine extends PurchaseLine {
   key: string;
+  splits?: DraftSplit[];
 }
 
 function PurchaseForm({ onClose }: { onClose: () => void }) {
-  const { db, update } = useStore();
+  const { db, setDB } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [receipt, setReceipt] = useState<{ name: string; dataUrl: string } | null>(null);
   const [form, setForm] = useState({
@@ -189,12 +256,22 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
 
   const total = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
 
+  /** Base units a stocked line brings in, and how much of it is already promised to farms. */
+  const received = (l: DraftLine) => {
+    const item = db.items.find((i) => i.id === l.itemId);
+    return item ? l.quantity * packSizeOf(item) : 0;
+  };
+  const allocated = (l: DraftLine) => (l.splits ?? []).reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+  // the same item on two lines shares one pool of stock, but each line's split is checked against its own quantity
+  const overAllocated = lines.some((l) => l.itemId && allocated(l) > received(l) + 1e-9);
+
   const submit = () => {
     const valid = lines.filter((l) => l.invoiceName.trim() && l.quantity > 0);
-    if (valid.length === 0) return;
+    if (valid.length === 0 || overAllocated) return;
 
+    const purchaseId = newId("pu");
     const purchase: Purchase = {
-      id: newId("pu"),
+      id: purchaseId,
       date: form.date,
       supplierId: form.supplierId,
       paidBy: form.paidBy,
@@ -202,30 +279,36 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
       receiptName: receipt?.name,
       receiptDataUrl: receipt?.dataUrl,
       notes: form.notes || undefined,
-      lines: valid.map(({ key, ...l }) => l), // eslint-disable-line @typescript-eslint/no-unused-vars
+      lines: valid.map(({ key, splits, ...l }) => l), // eslint-disable-line @typescript-eslint/no-unused-vars
     };
-    update("purchases", (list) => [...list, purchase]);
 
-    // update stock + last cost for every line linked to a tracked item
-    update("items", (list) =>
-      list.map((item) => {
+    setDB((prev) => {
+      const newAllocations: StockAllocation[] = [];
+      const items = prev.items.map((item) => {
         const relevant = valid.filter((l) => l.itemId === item.id);
         if (relevant.length === 0) return item;
-        const addedQty = relevant.reduce((s, l) => s + l.quantity, 0);
+        const pack = packSizeOf(item);
+        const addedQty = relevant.reduce((s, l) => s + l.quantity * pack, 0);
+        const lastLine = relevant[relevant.length - 1];
+        const unitCost = lastLine.unitPrice ? lastLine.unitPrice / pack : item.lastCostPerUnit;
+        const farmStock = { ...(item.farmStock ?? {}) };
+        for (const l of relevant)
+          for (const sp of l.splits ?? []) {
+            const q = Number(sp.quantity) || 0;
+            if (!sp.farmId || q <= 0) continue;
+            farmStock[sp.farmId] = Number(((farmStock[sp.farmId] ?? 0) + q).toFixed(3));
+            newAllocations.push({ id: newId("al"), date: form.date, itemId: item.id, farmId: sp.farmId, quantity: q, unitCost, purchaseId, kind: "purchase" });
+          }
         const newAliases = [...item.aliases];
         for (const l of relevant) {
           const nm = l.invoiceName.trim();
           if (nm && !newAliases.some((a) => a.supplierId === form.supplierId && a.aliasName.toLowerCase() === nm.toLowerCase()))
             newAliases.push({ supplierId: form.supplierId, aliasName: nm });
         }
-        return {
-          ...item,
-          stock: item.stock + addedQty,
-          lastCostPerUnit: relevant[relevant.length - 1].unitPrice || item.lastCostPerUnit,
-          aliases: newAliases,
-        };
-      })
-    );
+        return { ...item, stock: Number((item.stock + addedQty).toFixed(3)), farmStock, lastCostPerUnit: Number(unitCost.toFixed(4)), aliases: newAliases };
+      });
+      return { ...prev, purchases: [...prev.purchases, purchase], items, allocations: [...(prev.allocations ?? []), ...newAllocations] };
+    });
     onClose();
   };
 
@@ -290,8 +373,11 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
             Line items — type the name exactly as printed on the invoice, then link it to a stock item (leave unlinked for one-time purchases)
           </p>
           <div className="space-y-2">
-            {lines.map((l) => (
-              <div key={l.key} className="grid grid-cols-[1fr_70px_90px_1fr_28px] items-center gap-2">
+            {lines.map((l) => {
+              const item = db.items.find((i) => i.id === l.itemId);
+              return (
+              <div key={l.key} className="rounded-xl">
+              <div className="grid grid-cols-[1fr_70px_90px_1fr_28px] items-center gap-2">
                 <input
                   value={l.invoiceName}
                   onChange={(e) => {
@@ -340,7 +426,65 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
                   ✕
                 </button>
               </div>
-            ))}
+                {item && (
+                  <div className="mt-2 rounded-xl border border-hairline bg-surface-2 p-3 text-xs">
+                    <p className="text-ink-2">
+                      Stock received: <span className="font-medium text-ink">{received(l).toLocaleString()} {item.unit}</span>
+                      {packSizeOf(item) > 1 && item.packLabel ? ` (${l.quantity} ${item.packLabel}${l.quantity === 1 ? "" : "s"} × ${packSizeOf(item)} ${item.unit})` : ""}
+                    </p>
+                    {(l.splits ?? []).map((sp) => (
+                      <div key={sp.key} className="mt-2 flex items-center gap-2">
+                        <select
+                          value={sp.farmId}
+                          onChange={(e) => setLine(l.key, { splits: (l.splits ?? []).map((x) => (x.key === sp.key ? { ...x, farmId: e.target.value } : x)) })}
+                          className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-xs"
+                        >
+                          {db.farms.map((f) => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          value={sp.quantity}
+                          onChange={(e) => setLine(l.key, { splits: (l.splits ?? []).map((x) => (x.key === sp.key ? { ...x, quantity: e.target.value } : x)) })}
+                          placeholder={item.unit}
+                          className="w-24 rounded-lg border border-hairline bg-surface px-2 py-1.5 text-xs tnum"
+                        />
+                        <span className="text-muted">{item.unit}</span>
+                        <button
+                          onClick={() => setLine(l.key, { splits: (l.splits ?? []).filter((x) => x.key !== sp.key) })}
+                          className="text-muted hover:text-critical"
+                          aria-label="Remove farm split"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() =>
+                          setLine(l.key, {
+                            splits: [
+                              ...(l.splits ?? []),
+                              { key: String(Date.now()), farmId: db.farms.find((f) => !(l.splits ?? []).some((x) => x.farmId === f.id))?.id ?? db.farms[0]?.id ?? "", quantity: "" },
+                            ],
+                          })
+                        }
+                        className="text-accent hover:underline"
+                      >
+                        + Split to a farm
+                      </button>
+                      <span className={allocated(l) > received(l) + 1e-9 ? "font-medium text-critical" : "text-muted"}>
+                        Allocated {allocated(l).toLocaleString()} {item.unit} · balance in Main{" "}
+                        {(received(l) - allocated(l)).toLocaleString()} {item.unit}
+                        {allocated(l) > received(l) + 1e-9 ? " — more than received" : ""}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              );
+            })}
           </div>
           <button
             onClick={() => setLines([...lines, { key: String(Date.now()), invoiceName: "", quantity: 1, unitPrice: 0 }])}
@@ -360,6 +504,7 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
               Will be filed as a claim ({fmtRM(total)}) against the company, status &ldquo;To Claim&rdquo;.
             </p>
           )}
+          {overAllocated && <p className="mt-1 text-xs text-critical">A farm split is larger than the quantity received — fix it before saving.</p>}
           {lines.some((l) => l.itemId) && (
             <p className="mt-1 text-xs text-good">
               Stock will be increased for: {lines.filter((l) => l.itemId).map((l) => db.items.find((i) => i.id === l.itemId)?.name).join(", ")}

@@ -292,12 +292,36 @@ export interface InventoryItem {
   id: string;
   name: string; // our standard name
   category: "Fertilizer" | "Pesticide" | "Fungicide" | "Herbicide" | "Tools" | "Materials" | "Other";
-  unit: string; // kg, L, bag, roll...
+  /** Base unit stock is counted in - kg, L, pcs, roll... - so a pack can be split into any amount. */
+  unit: string;
+  /** Base units in one pack as bought (a 25 kg bag = 25). Blank/1 = bought in base units. */
+  packSize?: number;
+  /** What one pack is called on the invoice: "bag", "bottle", "pack"... */
+  packLabel?: string;
+  /** Total on hand across the main store and every farm, in base units. */
   stock: number;
-  minStock: number;
+  /**
+   * Part of `stock` already handed to each farm (farmId -> base units). The rest,
+   * stock minus the sum of these, is the Main (unallocated) balance.
+   */
+  farmStock?: Record<string, number>;
+  minStock: number; // base units, against total stock
+  /** Cost of one base unit (per kg / per L / per pc) at the last purchase. */
   lastCostPerUnit: number;
   aliases: { supplierId: string; aliasName: string }[]; // invoice names differ by supplier
   trackInventory: boolean;
+}
+
+/** One movement of stock into (+) or out of (−) a farm's share: a purchase split or a transfer. */
+export interface StockAllocation {
+  id: string;
+  date: string;
+  itemId: string;
+  farmId: string;
+  quantity: number; // base units; negative when pulled back out of the farm
+  unitCost: number; // cost per base unit when it moved
+  purchaseId?: string;
+  kind: "purchase" | "transfer";
 }
 
 export interface PurchaseLine {
@@ -396,6 +420,7 @@ export interface DB {
   suppliers: Supplier[];
   items: InventoryItem[];
   purchases: Purchase[];
+  allocations: StockAllocation[];
   payments: Payment[];
   usageLogs: UsageLog[];
   applications: ApplicationRecord[];
