@@ -2,8 +2,9 @@
 
 import { useState, useRef } from "react";
 import { useStore, newId } from "@/lib/store";
-import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, MonthSelect, EmptyState, ConfirmDialog } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, purchaseTotal, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
+import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, EmptyState, ConfirmDialog } from "@/components/ui";
+import { fmtRM, fmtRM0, fmtDate, purchaseTotal, currentMonthKey, TODAY } from "@/lib/utils";
+import DateRangeFilter, { DateRange, monthRange, inDateRange, rangeLabel } from "@/components/DateRangeFilter";
 import { Purchase, StockAllocation, InventoryItem } from "@/lib/types";
 import { packSizeOf, mainBalance, lineBaseQty, reversePurchase } from "@/lib/stock";
 import ItemForm from "@/components/ItemForm";
@@ -15,17 +16,19 @@ export default function PurchasesPage() {
   const [splitPurchase, setSplitPurchase] = useState<Purchase | null>(null);
   const [editPurchase, setEditPurchase] = useState<Purchase | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
-  const months = lastNMonthKeys(12).reverse();
-  const [month, setMonth] = useState(
-    () => months.find((m) => db.purchases.some((p) => p.date.startsWith(m))) ?? currentMonthKey()
+  const [range, setRange] = useState<DateRange>(() =>
+    monthRange(
+      [...db.purchases.map((p) => p.date.slice(0, 7))].sort().pop() ?? currentMonthKey()
+    )
   );
+  const label = rangeLabel(range);
 
   const claims = db.purchases.filter((p) => p.paidBy === "Own Pocket");
   const toClaim = claims.filter((p) => p.claimStatus === "To Claim");
   const claimPending = claims.filter((p) => p.claimStatus !== "Reimbursed");
   const claimPendingTotal = claimPending.reduce((s, p) => s + purchaseTotal(p), 0);
   const totalSpend = db.purchases.reduce((s, p) => s + purchaseTotal(p), 0);
-  const monthPurchases = db.purchases.filter((p) => p.date.startsWith(month));
+  const monthPurchases = db.purchases.filter((p) => inDateRange(p.date, range));
   const monthVendors = new Set(monthPurchases.map((p) => p.supplierId)).size;
 
   /** Removing a purchase takes back what it added: the stock, and each farm's share of it. */
@@ -60,22 +63,22 @@ export default function PurchasesPage() {
         subtitle="Upload receipts, link them to stock items and claim personal spend"
         actions={
           <>
-            <MonthSelect value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button onClick={() => setShowPurchase(true)}>+ New Purchase / Receipt</Button>
           </>
         }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={`Purchases — ${monthLabel(month)}`} value={fmtRM0(monthPurchases.reduce((s, p) => s + purchaseTotal(p), 0))} sub={`${monthPurchases.length} record(s)`} />
+        <StatCard label={`Purchases — ${label}`} value={fmtRM0(monthPurchases.reduce((s, p) => s + purchaseTotal(p), 0))} sub={`${monthPurchases.length} record(s)`} />
         <StatCard label="Claims outstanding" value={fmtRM0(claimPendingTotal)} sub={`${toClaim.length} not yet submitted`} tone={claimPendingTotal > 0 ? "warning" : "good"} />
-        <StatCard label={`Vendors used — ${monthLabel(month)}`} value={String(monthVendors)} />
+        <StatCard label={`Vendors used — ${label}`} value={String(monthVendors)} />
         <StatCard label="All-time purchases" value={fmtRM0(totalSpend)} sub={`${db.purchases.length} record(s)`} />
       </div>
 
-      <Card title={`Purchases — ${monthLabel(month)}`}>
+      <Card title={`Purchases — ${label}`}>
         {monthPurchases.length === 0 ? (
-          <EmptyState message="No purchases recorded for this month." />
+          <EmptyState message="No purchases recorded for this period." />
         ) : (
         <Table>
           <thead>

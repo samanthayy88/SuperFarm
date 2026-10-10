@@ -17,20 +17,21 @@ import {
   EmptyState,
   ConfirmDialog,
 } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, currentMonthKey, monthLabel, lastNMonthKeys } from "@/lib/utils";
+import { fmtRM, fmtRM0, fmtDate, currentMonthKey } from "@/lib/utils";
+import DateRangeFilter, { DateRange, monthRange, inDateRange, rangeLabel } from "@/components/DateRangeFilter";
 import { Payment, PaymentCategory } from "@/lib/types";
 
 export default function PaymentPage() {
   const { db, update } = useStore();
-  const months = lastNMonthKeys(6).reverse();
-  const [month, setMonth] = useState(
-    () => months.find((m) => db.payments.some((p) => p.date.startsWith(m))) ?? currentMonthKey()
+  const [range, setRange] = useState<DateRange>(() =>
+    monthRange([...db.payments.map((p) => p.date.slice(0, 7))].sort().pop() ?? currentMonthKey())
   );
+  const label = rangeLabel(range);
   const [paymentForm, setPaymentForm] = useState<{ mode: "add" } | { mode: "edit"; payment: Payment } | null>(null);
   const [deletePayment, setDeletePayment] = useState<Payment | null>(null);
 
   const monthPayments = db.payments
-    .filter((p) => p.date.startsWith(month))
+    .filter((p) => inDateRange(p.date, range))
     .sort((a, b) => b.date.localeCompare(a.date));
   const totalSpent = monthPayments.reduce((s, p) => s + p.amount, 0);
 
@@ -46,28 +47,20 @@ export default function PaymentPage() {
         subtitle="Ad-hoc company bills — utilities, transport, professional fees and other one-off costs"
         actions={
           <>
-            <select
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="rounded border border-hairline bg-surface-2 px-3 py-2 text-sm text-ink"
-            >
-              {months.map((m) => (
-                <option key={m} value={m}>{monthLabel(m)}</option>
-              ))}
-            </select>
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button onClick={() => setPaymentForm({ mode: "add" })}>+ Record Payment</Button>
           </>
         }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatCard label={`Total payments — ${monthLabel(month)}`} value={fmtRM0(totalSpent)} />
-        <StatCard label="Records this month" value={String(monthPayments.length)} />
+        <StatCard label={`Total payments — ${label}`} value={fmtRM0(totalSpent)} />
+        <StatCard label="Records in this period" value={String(monthPayments.length)} />
       </div>
 
-      <Card title={`Payments — ${monthLabel(month)}`}>
+      <Card title={`Payments — ${label}`}>
         {monthPayments.length === 0 ? (
-          <EmptyState message="No payments recorded for this month." />
+          <EmptyState message="No payments recorded for this period." />
         ) : (
           <Table>
             <thead>

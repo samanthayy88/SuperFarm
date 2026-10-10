@@ -18,21 +18,22 @@ import {
   ConfirmDialog,
   StatCard,
 } from "@/components/ui";
-import { fmtRM, fmtRM0, fmtDate, currentMonthKey, monthLabel, lastNMonthKeys } from "@/lib/utils";
+import { fmtRM, fmtRM0, fmtDate, currentMonthKey } from "@/lib/utils";
+import DateRangeFilter, { DateRange, monthRange, inDateRange, rangeLabel } from "@/components/DateRangeFilter";
 import { WorkerExpense, WorkerExpenseType } from "@/lib/types";
 
 export default function WorkerExpensesPage() {
   const { db, update } = useStore();
-  const months = lastNMonthKeys(6).reverse();
-  const [month, setMonth] = useState(
-    () => months.find((m) => db.workerExpenses.some((e) => e.date.startsWith(m))) ?? currentMonthKey()
+  const [range, setRange] = useState<DateRange>(() =>
+    monthRange([...db.workerExpenses.map((e) => e.date.slice(0, 7))].sort().pop() ?? currentMonthKey())
   );
+  const label = rangeLabel(range);
   const [expenseForm, setExpenseForm] = useState<
     { mode: "add"; workerId: string } | { mode: "edit"; expense: WorkerExpense } | null
   >(null);
   const [deleteExpense, setDeleteExpense] = useState<WorkerExpense | null>(null);
 
-  const monthExpenses = db.workerExpenses.filter((e) => e.date.startsWith(month));
+  const monthExpenses = db.workerExpenses.filter((e) => inDateRange(e.date, range));
   const totalAdvances = monthExpenses.filter((e) => e.type === "Cash Advance").reduce((s, e) => s + e.amount, 0);
   const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
   const totalDeductible = monthExpenses.filter((e) => e.deductFromSalary).reduce((s, e) => s + e.amount, 0);
@@ -48,22 +49,12 @@ export default function WorkerExpensesPage() {
         title="Worker Expenses"
         subtitle="Groceries, top-ups, cigarettes and cash advances, with optional salary deduction"
         actions={
-          <select
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="rounded border border-hairline bg-surface-2 px-3 py-2 text-sm text-ink"
-          >
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
+          <DateRangeFilter value={range} onChange={setRange} />
         }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label={`Total expenses — ${monthLabel(month)}`} value={fmtRM0(totalSpent)} sub="Groceries, top-ups, cigarettes, advances" />
+        <StatCard label={`Total expenses — ${label}`} value={fmtRM0(totalSpent)} sub="Groceries, top-ups, cigarettes, advances" />
         <StatCard label="Cash advances given" value={fmtRM0(totalAdvances)} tone={totalAdvances > 0 ? "warning" : undefined} />
         <StatCard label="To deduct from salary" value={fmtRM0(totalDeductible)} sub="See Payroll" tone={totalDeductible > 0 ? "warning" : undefined} />
       </div>
@@ -90,7 +81,7 @@ export default function WorkerExpensesPage() {
               }
             >
               {expenses.length === 0 ? (
-                <EmptyState message={`No expenses recorded for ${monthLabel(month)}.`} />
+                <EmptyState message={`No expenses recorded for ${label}.`} />
               ) : (
                 <Table>
                   <thead>
