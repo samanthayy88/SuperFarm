@@ -36,6 +36,24 @@ export function rangeLabel(r: DateRange): string {
 
 const PRESETS: { id: string; label: string; range: () => DateRange }[] = [
   {
+    id: "last-7",
+    label: "Last 7 days",
+    range: () => {
+      const d = new Date();
+      d.setDate(d.getDate() - 6);
+      return { from: iso(d), to: iso(new Date()) };
+    },
+  },
+  {
+    id: "last-30",
+    label: "Last 30 days",
+    range: () => {
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      return { from: iso(d), to: iso(new Date()) };
+    },
+  },
+  {
     id: "this-month",
     label: "This month",
     range: () => monthRange(iso(new Date()).slice(0, 7)),

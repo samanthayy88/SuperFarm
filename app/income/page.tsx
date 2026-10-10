@@ -26,8 +26,6 @@ import {
   commissionRateFor,
   commissionSourceFor,
   currentMonthKey,
-  monthLabel,
-  lastNMonthKeys,
   saleTotal,
   saleKg,
   saleDueDate,
@@ -42,20 +40,24 @@ import {
 } from "@/lib/utils";
 import { HarvestRecord, SaleRecord, SaleGradeLine, WasteRecord, WasteReason } from "@/lib/types";
 import VarietySelect from "@/components/VarietySelect";
+import DateRangeFilter, { DateRange, monthRange, inDateRange, rangeLabel } from "@/components/DateRangeFilter";
 
 export default function IncomePage() {
   const { db, update } = useStore();
   const [tab, setTab] = useState("Harvest Records");
 
   // ---- Harvest Records ----
-  const months = lastNMonthKeys(6).reverse();
-  const [month, setMonth] = useState(
-    () => months.find((m) => db.harvests.some((h) => h.date.startsWith(m))) ?? currentMonthKey()
+  // one period for the whole page; Today and the all-time overview stay as they are
+  const [range, setRange] = useState<DateRange>(() =>
+    monthRange(
+      [...db.harvests.map((h) => h.date.slice(0, 7)), ...db.sales.map((s) => s.date.slice(0, 7))].sort().pop() ?? currentMonthKey()
+    )
   );
+  const label = rangeLabel(range);
   const [harvestForm, setHarvestForm] = useState<{ mode: "add" } | { mode: "edit"; harvest: HarvestRecord } | null>(null);
   const [deleteHarvest, setDeleteHarvest] = useState<HarvestRecord | null>(null);
 
-  const rows = db.harvests.filter((h) => h.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date));
+  const rows = db.harvests.filter((h) => inDateRange(h.date, range)).sort((a, b) => b.date.localeCompare(a.date));
   const totalKg = rows.reduce((s, h) => s + h.quantityKg, 0);
   const totalCommission = rows.reduce((s, h) => s + h.quantityKg * h.commissionRate, 0);
 
@@ -66,12 +68,11 @@ export default function IncomePage() {
 
   // ---- Sales ----
   const [saleForm, setSaleForm] = useState<{ cropId?: string; farmId?: string } | null>(null);
-  const year = String(TODAY.getFullYear());
   const pending = db.sales.filter((s) => s.paymentStatus === "Pending");
   const receivables = pending.reduce((s, x) => s + saleTotal(x), 0);
-  const yearSales = db.sales.filter((s) => s.date.startsWith(year));
-  const yearRevenue = yearSales.reduce((s, x) => s + saleTotal(x), 0);
-  const yearKg = yearSales.reduce((s, x) => s + saleKg(x), 0);
+  const rangeSales = db.sales.filter((s) => inDateRange(s.date, range));
+  const rangeRevenue = rangeSales.reduce((s, x) => s + saleTotal(x), 0);
+  const rangeKg = rangeSales.reduce((s, x) => s + saleKg(x), 0);
   const overdue = pending.filter((s) => {
     const col = db.collectors.find((c) => c.id === s.collectorId);
     return col ? saleOverdueDays(s, col.paymentTermDays) > 0 : false;
@@ -118,14 +119,11 @@ export default function IncomePage() {
 
   // ---- Daily stock: movement and running balance, straight from the records ----
   const today = todayLocalISO();
-  const daysAgo = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
   const [stockCrop, setStockCrop] = useState("");
-  const [stockFrom, setStockFrom] = useState(() => daysAgo(30));
-  const [stockTo, setStockTo] = useState(today);
+  // the ledger follows the page period; an open end falls back to the first record / today
+  const firstRecord = [...db.harvests.map((h) => h.date), ...db.sales.map((x) => x.date)].sort()[0] ?? today;
+  const stockFrom = range.from || firstRecord;
+  const stockTo = range.to || today;
   const ledger = stockLedger(db, stockFrom, stockTo, stockCrop || undefined);
   const todayMoves = stockLedger(db, today, today, stockCrop || undefined).rows;
   const todayHarvested = todayMoves.reduce((s, r) => s + r.harvestedKg, 0);
@@ -148,7 +146,7 @@ export default function IncomePage() {
     update("wastage", (list) => list.filter((x) => x.id !== w.id));
     setDeleteWaste(null);
   };
-  const wasteRows = [...(db.wastage ?? [])].sort((a, b) => b.date.localeCompare(a.date));
+  const wasteRows = (db.wastage ?? []).filter((w) => inDateRange(w.date, range)).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div>
@@ -156,24 +154,16 @@ export default function IncomePage() {
         title="Harvest & Sales"
         subtitle="Record what's picked, then sell it to a collector — kg harvested and kg sold stay linked so nothing is entered twice"
         actions={
-          tab === "Harvest Records" ? (
-            <>
-              <select
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="rounded border border-hairline bg-surface-2 px-3 py-2 text-sm text-ink"
-              >
-                {months.map((m) => (
-                  <option key={m} value={m}>{monthLabel(m)}</option>
-                ))}
-              </select>
+          <>
+            <DateRangeFilter value={range} onChange={setRange} />
+            {tab === "Harvest Records" ? (
               <Button onClick={() => setHarvestForm({ mode: "add" })}>+ Record Harvest</Button>
-            </>
-          ) : tab === "Sales" ? (
-            <Button onClick={() => setSaleForm({})}>+ Record Sale</Button>
-          ) : tab === "Wastage" ? (
-            <Button onClick={() => setWasteForm({ mode: "add" })}>+ Record Wastage</Button>
-          ) : undefined
+            ) : tab === "Sales" ? (
+              <Button onClick={() => setSaleForm({})}>+ Record Sale</Button>
+            ) : tab === "Wastage" ? (
+              <Button onClick={() => setWasteForm({ mode: "add" })}>+ Record Wastage</Button>
+            ) : null}
+          </>
         }
       />
 
@@ -310,9 +300,7 @@ export default function IncomePage() {
         />
         <StatCard label="Written off (rotten / lost)" value={`${vol.wasted.toLocaleString()} kg`} sub={`${pctOf(vol.wasted)} — cost absorbed by the farm`} tone={vol.wasted > 0 ? "critical" : undefined} />
       </div>
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={`Harvested — ${monthLabel(month)}`} value={`${totalKg.toLocaleString()} kg`} sub={`${fmtRM(totalCommission)} commission`} />
-        <StatCard label={`Revenue ${year}`} value={fmtRM0(yearRevenue)} sub={`${yearKg.toLocaleString()} kg sold`} />
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard label="Outstanding receivables" value={fmtRM0(receivables)} sub={`${pending.length} sale(s) unpaid`} tone={receivables > 0 ? "warning" : "good"} />
         <StatCard label="Overdue payments" value={String(overdue.length)} tone={overdue.length > 0 ? "critical" : "good"} sub="Past collector payment term" />
       </div>
@@ -389,10 +377,23 @@ export default function IncomePage() {
 
       <Tabs tabs={["Harvest Records", "Sales", "Daily Stock", "Wastage", "Average Price by Crop", "Collector Payments"]} active={tab} onChange={setTab} />
 
+      {/* follows the period picker at the top of the page */}
+      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard label={`Harvested — ${label}`} value={`${totalKg.toLocaleString()} kg`} sub={`${fmtRM(totalCommission)} commission`} />
+        <StatCard label="Sold in period" value={`${rangeKg.toLocaleString()} kg`} sub={`${rangeSales.length} sale(s)`} tone={rangeKg > 0 ? "good" : undefined} />
+        <StatCard label="Revenue in period" value={fmtRM0(rangeRevenue)} sub={rangeKg > 0 ? `Avg ${fmtRM(rangeRevenue / rangeKg)}/kg` : "No sales in this period"} />
+        <StatCard
+          label="Written off in period"
+          value={`${wasteRows.reduce((s, w) => s + w.quantityKg, 0).toLocaleString()} kg`}
+          tone={wasteRows.length > 0 ? "critical" : undefined}
+          sub={`${wasteRows.length} record(s)`}
+        />
+      </div>
+
       {tab === "Harvest Records" && (
-        <Card title={`Harvest records — ${monthLabel(month)}`}>
+        <Card title={`Harvest records — ${label}`}>
           {rows.length === 0 ? (
-            <EmptyState message="No harvest recorded for this month." />
+            <EmptyState message="No harvest recorded for this period." />
           ) : (
             <Table>
               <thead>
@@ -483,17 +484,9 @@ export default function IncomePage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="From">
-                <TextInput type="date" value={stockFrom} onChange={(e) => setStockFrom(e.target.value)} />
-              </Field>
-              <Field label="To">
-                <TextInput type="date" value={stockTo} onChange={(e) => setStockTo(e.target.value)} />
-              </Field>
-              <div className="flex items-end gap-2">
-                <Button small variant="ghost" onClick={() => { setStockFrom(daysAgo(7)); setStockTo(today); }}>7 days</Button>
-                <Button small variant="ghost" onClick={() => { setStockFrom(daysAgo(30)); setStockTo(today); }}>30 days</Button>
-                <Button small variant="ghost" onClick={() => { setStockFrom(daysAgo(90)); setStockTo(today); }}>90 days</Button>
-              </div>
+              <p className="self-end text-xs text-muted sm:col-span-3">
+                Showing {fmtDate(stockFrom)} to {fmtDate(stockTo)} — change the period at the top of the page.
+              </p>
             </div>
             {ledger.rows.length === 0 ? (
               <EmptyState message="No harvests, sales or write-offs in this period." />
@@ -595,7 +588,7 @@ export default function IncomePage() {
       )}
 
       {tab === "Sales" && (
-        <Card title="All sales">
+        <Card title={`Sales — ${label}`}>
           <Table>
             <thead>
               <tr>
@@ -610,7 +603,7 @@ export default function IncomePage() {
               </tr>
             </thead>
             <tbody>
-              {[...db.sales].sort((a, b) => b.date.localeCompare(a.date)).map((s) => {
+              {[...rangeSales].sort((a, b) => b.date.localeCompare(a.date)).map((s) => {
                 const col = db.collectors.find((c) => c.id === s.collectorId);
                 const crop = db.crops.find((c) => c.id === s.cropId)?.name ?? "—";
                 const farm = db.farms.find((f) => f.id === s.farmId)?.name ?? "—";
@@ -663,7 +656,7 @@ export default function IncomePage() {
       {tab === "Average Price by Crop" && (
         <div className="space-y-4">
           {db.crops.map((crop) => {
-            const cropSales = db.sales.filter((s) => s.cropId === crop.id && s.date.startsWith(year));
+            const cropSales = db.sales.filter((s) => s.cropId === crop.id && inDateRange(s.date, range));
             if (cropSales.length === 0) return null;
             const totalKgC = cropSales.reduce((s, x) => s + saleKg(x), 0);
             const totalRevC = cropSales.reduce((s, x) => s + saleTotal(x), 0);
@@ -679,7 +672,7 @@ export default function IncomePage() {
               colMap.set(s.collectorId, { kg: cur.kg + saleKg(s), rev: cur.rev + saleTotal(s) });
             }
             return (
-              <Card key={crop.id} title={`${crop.name} — ${year} average selling price: RM ${(totalRevC / totalKgC).toFixed(2)}/kg`}>
+              <Card key={crop.id} title={`${crop.name} — ${label} average selling price: RM ${(totalRevC / totalKgC).toFixed(2)}/kg`}>
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <div>
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">By grade</p>
@@ -748,7 +741,7 @@ export default function IncomePage() {
                 <Th>Collector</Th>
                 <Th>Phone</Th>
                 <Th right>Payment term</Th>
-                <Th right>Sales {year}</Th>
+                <Th right>Sales in period</Th>
                 <Th right>Total bought</Th>
                 <Th right>Still owing</Th>
                 <Th>Payment record</Th>
@@ -757,7 +750,7 @@ export default function IncomePage() {
             <tbody>
               {db.collectors.map((c) => {
                 const theirSales = db.sales.filter((s) => s.collectorId === c.id);
-                const yearTheirs = theirSales.filter((s) => s.date.startsWith(year));
+                const yearTheirs = theirSales.filter((s) => inDateRange(s.date, range));
                 const owing = theirSales.filter((s) => s.paymentStatus === "Pending").reduce((s, x) => s + saleTotal(x), 0);
                 const paidSales = theirSales.filter((s) => s.paymentStatus === "Received" && s.paymentReceivedDate);
                 const avgDays =
