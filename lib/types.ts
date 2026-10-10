@@ -291,7 +291,8 @@ export interface Supplier extends BusinessProfile {
 export interface InventoryItem {
   id: string;
   name: string; // our standard name
-  category: "Fertilizer" | "Pesticide" | "Fungicide" | "Herbicide" | "Tools" | "Materials" | "Other";
+  /** Name of an Expense Category (Expenses > Expense Category). */
+  category: string;
   /** Base unit stock is counted in - kg, L, pcs, roll... - so a pack can be split into any amount. */
   unit: string;
   /** Base units in one pack as bought (a 25 kg bag = 25). Blank/1 = bought in base units. */
@@ -324,11 +325,32 @@ export interface StockAllocation {
   kind: "purchase" | "transfer";
 }
 
+/** A unit in the managed list (Setting > Units of Measure): a pack ("bag") or a measure ("kg"). */
+export interface UnitOfMeasure {
+  id: string;
+  name: string;
+  kind: "pack" | "measure";
+}
+
+/** A purchase/item category (Expenses > Expense Category). */
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  /** Not used up (tools, netting): charged to a farm when handed to it rather than when used. */
+  durable?: boolean;
+}
+
 export interface PurchaseLine {
   itemId?: string; // linked inventory item (undefined = one-time, not tracked)
   invoiceName: string; // name as written on supplier invoice
-  quantity: number;
-  unitPrice: number;
+  quantity: number; // number of packs, in `uom`
+  unitPrice: number; // RM per pack
+  /** What a pack is called on the invoice: bag, bottle, pcs... */
+  uom?: string;
+  /** Content of one pack, in `packUnit` (25 for a 25 kg bag). Stock added = quantity x packSize. */
+  packSize?: number;
+  packUnit?: string; // kg, L, pcs...
+  category?: string; // Expense Category name
 }
 
 export interface Purchase {
@@ -421,6 +443,8 @@ export interface DB {
   items: InventoryItem[];
   purchases: Purchase[];
   allocations: StockAllocation[];
+  uoms: UnitOfMeasure[];
+  expenseCategories: ExpenseCategory[];
   payments: Payment[];
   usageLogs: UsageLog[];
   applications: ApplicationRecord[];

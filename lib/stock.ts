@@ -1,4 +1,4 @@
-import { InventoryItem } from "./types";
+import { DB, InventoryItem, Purchase } from "./types";
 
 /**
  * Stock is counted in base units (kg, L, pcs). `item.stock` is the total on
@@ -10,6 +10,12 @@ const r3 = (n: number) => Number(n.toFixed(3));
 
 export function packSizeOf(item: InventoryItem): number {
   return item.packSize && item.packSize > 0 ? item.packSize : 1;
+}
+
+/** Base units a purchase line brought in: packs bought x content of one pack. */
+export function lineBaseQty(line: { quantity: number; packSize?: number }, item: InventoryItem): number {
+  const pack = line.packSize && line.packSize > 0 ? line.packSize : packSizeOf(item);
+  return Number((line.quantity * pack).toFixed(3));
 }
 
 export function farmBalance(item: InventoryItem, farmId: string): number {
@@ -66,4 +72,22 @@ export function parseLegacyUnit(unit: string): { unit: string; packSize: number;
     return { unit: base, packSize: Number(m[2]), packLabel: m[1].trim() };
   }
   return { unit: unit.trim() || "pcs", packSize: 1 };
+}
+
+/** The DB as if `purchase` had never been recorded: its stock and each farm's share of it are taken back out. */
+export function reversePurchase(db: DB, purchase: Purchase): DB {
+  const mine = (db.allocations ?? []).filter((a) => a.purchaseId === purchase.id);
+  return {
+    ...db,
+    purchases: db.purchases.filter((p) => p.id !== purchase.id),
+    allocations: (db.allocations ?? []).filter((a) => a.purchaseId !== purchase.id),
+    items: db.items.map((item) => {
+      const added = purchase.lines.filter((l) => l.itemId === item.id).reduce((s, l) => s + lineBaseQty(l, item), 0);
+      if (added === 0) return item;
+      const farmStock = { ...(item.farmStock ?? {}) };
+      for (const a of mine.filter((x) => x.itemId === item.id))
+        farmStock[a.farmId] = Math.max(0, r3((farmStock[a.farmId] ?? 0) - a.quantity));
+      return { ...item, stock: Math.max(0, r3(item.stock - added)), farmStock };
+    }),
+  };
 }

@@ -171,11 +171,13 @@ export function Modal({
   onClose,
   children,
   wide,
+  xwide,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   wide?: boolean;
+  xwide?: boolean;
 }) {
   return (
     <div
@@ -183,7 +185,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-card border border-hairline bg-surface shadow-pop`}
+        className={`w-full ${xwide ? "max-w-6xl" : wide ? "max-w-3xl" : "max-w-lg"} rounded-card border border-hairline bg-surface shadow-pop`}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-hairline px-5 py-3.5">

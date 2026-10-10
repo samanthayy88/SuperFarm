@@ -37,9 +37,21 @@ function migrate(db: DB): DB {
       farmStock: {},
     };
   });
+  // purchase lines now carry their own pack size, so a later change to an item's pack can't
+  // alter what an old purchase added: fix each existing line to what its item was at that point
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  const purchases = (db.purchases ?? []).map((p) => ({
+    ...p,
+    lines: p.lines.map((l) => {
+      const it = l.itemId ? itemById.get(l.itemId) : undefined;
+      if (!it || l.packSize !== undefined) return l;
+      return { ...l, uom: l.uom ?? it.packLabel ?? it.unit, packSize: it.packSize ?? 1, packUnit: it.unit, category: l.category ?? it.category };
+    }),
+  }));
   return {
     ...db,
     items,
+    purchases,
     usageLogs: (db.usageLogs ?? []).map((u) => {
       const f = packFactor.get(u.itemId);
       return f && f !== 1 ? { ...u, quantity: Number((u.quantity * f).toFixed(3)) } : u;

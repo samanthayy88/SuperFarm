@@ -240,7 +240,10 @@ export function seasonCosting(
     .reduce((s, a) => s + applicationCost(a), 0);
   add("Farm inputs", "Spray rounds (pesticides, fungicides, foliar)", sprays, "Direct (logged against this plot)");
   // consumables are charged when used; tools and materials are not used up, so they are charged when handed to the farm
-  const durable = (cat?: string) => cat === "Tools" || cat === "Materials";
+  const durable = (cat?: string) => {
+    const c = (db.expenseCategories ?? []).find((x) => x.name === cat);
+    return c ? Boolean(c.durable) : cat === "Tools" || cat === "Materials";
+  };
   const stockUsed = db.usageLogs
     .filter((u) => inRange(u.date, from, to))
     .reduce((s, u) => {

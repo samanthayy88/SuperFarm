@@ -24,6 +24,7 @@ const nav = [
   { href: "/payment", label: "Payment", icon: "◑", group: "Expenses" },
   { href: "/worker-expenses", label: "Worker Expenses", icon: "▩", group: "Expenses" },
   { href: "/salary", label: "Salary", icon: "◔", group: "Expenses" },
+  { href: "/expense-categories", label: "Expense Category", icon: "▤", group: "Expenses" },
 
   { href: "/inventory", label: "Stock Level", icon: "▧", group: "Inventory" },
 
@@ -35,6 +36,7 @@ const nav = [
   { href: "/settings/crop-variety", label: "Crop & Variety", icon: "❖", group: "Setting" },
   { href: "/settings/collectors", label: "Collectors", icon: "◫", group: "Setting" },
   { href: "/settings/vendors", label: "Vendors", icon: "◨", group: "Setting" },
+  { href: "/settings/uom", label: "Units of Measure", icon: "⚖", group: "Setting" },
   { href: "/settings/dashboard", label: "Dashboard", icon: "⚙", group: "Setting" },
 ];
 

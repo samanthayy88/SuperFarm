@@ -509,6 +509,34 @@ export const seedDB: DB = {
     { id: "pm4", date: "2026-06-10", category: "Bank Charges", payee: "Maybank", description: "Account maintenance + cheque book", amount: 35 },
   ],
 
+  uoms: [
+    { id: "u_kg", name: "kg", kind: "measure" },
+    { id: "u_g", name: "g", kind: "measure" },
+    { id: "u_l", name: "L", kind: "measure" },
+    { id: "u_ml", name: "mL", kind: "measure" },
+    { id: "u_pcs", name: "pcs", kind: "measure" },
+    { id: "u_bag", name: "bag", kind: "pack" },
+    { id: "u_bottle", name: "bottle", kind: "pack" },
+    { id: "u_pack", name: "pack", kind: "pack" },
+    { id: "u_box", name: "box", kind: "pack" },
+    { id: "u_roll", name: "roll", kind: "pack" },
+    { id: "u_can", name: "can", kind: "pack" },
+    { id: "u_carton", name: "carton", kind: "pack" },
+  ],
+
+  expenseCategories: [
+    { id: "ec_fert", name: "Fertilizer" },
+    { id: "ec_pest", name: "Pesticide" },
+    { id: "ec_fung", name: "Fungicide" },
+    { id: "ec_herb", name: "Herbicide" },
+    { id: "ec_seed", name: "Seeds & Seedlings" },
+    { id: "ec_tools", name: "Tools", durable: true },
+    { id: "ec_mat", name: "Materials", durable: true },
+    { id: "ec_pack", name: "Packaging" },
+    { id: "ec_fuel", name: "Fuel" },
+    { id: "ec_other", name: "Other" },
+  ],
+
   // stock handed from the main store to individual farms (the demo split of NPK, abamectin and crates)
   allocations: [
     { id: "al1", date: "2026-07-06", itemId: "i1", farmId: "f1", quantity: 200, unitCost: 2.9, kind: "transfer" },

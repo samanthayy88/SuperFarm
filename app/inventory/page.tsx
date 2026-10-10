@@ -5,7 +5,8 @@ import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
 import { fmtRM, fmtDate, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { UsageLog, InventoryItem, StockAllocation } from "@/lib/types";
-import { consumeStock, transferStock, farmBalance, mainBalance, allocatedTotal, fmtStock, packSizeOf } from "@/lib/stock";
+import ItemForm from "@/components/ItemForm";
+import { consumeStock, transferStock, farmBalance, mainBalance, fmtStock, packSizeOf } from "@/lib/stock";
 
 export default function InventoryPage() {
   const { db } = useStore();
@@ -445,103 +446,6 @@ function UsageForm({ onClose }: { onClose: () => void }) {
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit}>Save Usage</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-const UNITS = ["kg", "L", "pcs", "roll", "g", "mL"];
-const CATEGORIES: InventoryItem["category"][] = ["Fertilizer", "Pesticide", "Fungicide", "Herbicide", "Tools", "Materials", "Other"];
-
-function ItemForm({ item, onClose }: { item?: InventoryItem; onClose: () => void }) {
-  const { update } = useStore();
-  const [form, setForm] = useState({
-    name: item?.name ?? "",
-    category: item?.category ?? ("Fertilizer" as InventoryItem["category"]),
-    unit: item?.unit ?? "kg",
-    packLabel: item?.packLabel ?? "",
-    packSize: item ? String(packSizeOf(item)) : "1",
-    minStock: item ? String(item.minStock) : "0",
-    trackInventory: item?.trackInventory ?? true,
-    stock: item ? String(item.stock) : "",
-  });
-  const size = Number(form.packSize) || 1;
-  const newStock = Number(form.stock) || 0;
-  const minAllowed = item ? allocatedTotal(item) : 0;
-  const stockTooLow = Boolean(item) && newStock < minAllowed - 1e-9;
-
-  const submit = () => {
-    if (!form.name.trim() || stockTooLow) return;
-    const payload = {
-      name: form.name.trim(),
-      category: form.category,
-      unit: form.unit,
-      packLabel: form.packLabel.trim() || undefined,
-      packSize: size,
-      minStock: Number(form.minStock) || 0,
-      trackInventory: form.trackInventory,
-    };
-    if (item) update("items", (list) => list.map((i) => (i.id === item.id ? { ...i, ...payload, stock: newStock } : i)));
-    else
-      update("items", (list) => [
-        ...list,
-        { id: newId("i"), stock: 0, lastCostPerUnit: 0, aliases: [], farmStock: {}, ...payload },
-      ]);
-    onClose();
-  };
-
-  return (
-    <Modal title={item ? `Edit ${item.name}` : "Add Stock Item"} onClose={onClose}>
-      <div className="space-y-3">
-        <Field label="Item name">
-          <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Pruning scissors" />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Category">
-            <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as InventoryItem["category"] })}>
-              {CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Count stock in (smallest unit)">
-            <Select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-              {UNITS.map((u) => (
-                <option key={u}>{u}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="One pack on the invoice is called">
-            <TextInput value={form.packLabel} onChange={(e) => setForm({ ...form, packLabel: e.target.value })} placeholder="bag, bottle, pack…" />
-          </Field>
-          <Field label={`${form.unit} in one pack`}>
-            <TextInput type="number" value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} />
-          </Field>
-        </div>
-        <p className="text-xs text-muted">
-          {size > 1
-            ? `Buying 1 ${form.packLabel || "pack"} adds ${size} ${form.unit} to stock, and you can split it between farms in ${form.unit}.`
-            : `Stock is counted one ${form.unit} at a time.`}
-          {item ? " Changing this only affects purchases you record from now on." : ""}
-        </p>
-        <Field label={`Minimum level (${form.unit}) — reorder alert`}>
-          <TextInput type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
-        </Field>
-        {item && (
-          <Field label={`Total stock on hand (${form.unit}) — change only to correct a miscount`}>
-            <TextInput type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-          </Field>
-        )}
-        {stockTooLow && (
-          <p className="text-xs text-critical">
-            {allocatedTotal(item!).toLocaleString()} {form.unit} is already handed to farms, so the total can&apos;t be lower. Move
-            some back to Main first.
-          </p>
-        )}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit}>{item ? "Save changes" : "Add Item"}</Button>
         </div>
       </div>
     </Modal>
