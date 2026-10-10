@@ -13,6 +13,7 @@ export default function InventoryPage() {
   const [showUsage, setShowUsage] = useState(false);
   const [itemForm, setItemForm] = useState<{ item?: InventoryItem } | null>(null);
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
+  const [place, setPlace] = useState("main"); // By Farm tab: "main" or a farm id
   const months = lastNMonthKeys(12).reverse();
   const [month, setMonth] = useState(
     () => months.find((m) => db.usageLogs.some((u) => u.date.startsWith(m))) ?? currentMonthKey()
@@ -43,7 +44,7 @@ export default function InventoryPage() {
         <StatCard label="Vendors" value={String(db.suppliers.length)} />
       </div>
 
-      <Tabs tabs={["Inventory", "Allocations", "Supplier Name Mapping", "Usage Log"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["Inventory", "By Farm", "Allocations", "Supplier Name Mapping", "Usage Log"]} active={tab} onChange={setTab} />
 
       {tab === "Inventory" && (
         <Card title="Stock levels — main store and each farm">
@@ -118,6 +119,79 @@ export default function InventoryPage() {
           </p>
         </Card>
       )}
+
+      {tab === "By Farm" && (() => {
+        const places = [{ id: "main", label: "Main store" }, ...db.farms.map((f) => ({ id: f.id, label: f.name }))];
+        const qtyAt = (i: InventoryItem) => (place === "main" ? mainBalance(i) : farmBalance(i, place));
+        const held = db.items.filter((i) => qtyAt(i) > 0);
+        const value = held.reduce((s, i) => s + qtyAt(i) * i.lastCostPerUnit, 0);
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {places.map((pl) => {
+                const itemsHere = db.items.filter((i) => (pl.id === "main" ? mainBalance(i) : farmBalance(i, pl.id)) > 0).length;
+                return (
+                  <button
+                    key={pl.id}
+                    onClick={() => setPlace(pl.id)}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                      place === pl.id ? "border-accent bg-accent text-on-accent" : "border-hairline bg-surface text-ink-2 hover:border-accent/40 hover:text-accent"
+                    }`}
+                  >
+                    {pl.label} <span className="opacity-70">· {itemsHere} item{itemsHere === 1 ? "" : "s"}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <StatCard label="Items held" value={String(held.length)} sub={places.find((x) => x.id === place)?.label} />
+              <StatCard label="Stock value here" value={fmtRM(value)} />
+              <StatCard
+                label="Share of all stock value"
+                value={stockValue > 0 ? `${((value / stockValue) * 100).toFixed(0)}%` : "—"}
+                sub={`of ${fmtRM(stockValue)} company-wide`}
+              />
+            </div>
+            <Card title={`Inventory — ${places.find((x) => x.id === place)?.label}`}>
+              {held.length === 0 ? (
+                <EmptyState message={place === "main" ? "Nothing sits in Main right now." : "Nothing has been allocated to this farm yet. Use “Split to farms” on a purchase, or “Split / transfer” on the Inventory tab."} />
+              ) : (
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Item</Th>
+                      <Th>Category</Th>
+                      <Th right>Quantity here</Th>
+                      <Th right>Value</Th>
+                      <Th right>Of total stock</Th>
+                      <Th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {held.map((i) => (
+                      <tr key={i.id}>
+                        <Td className="font-medium">{i.name}</Td>
+                        <Td>{i.category}</Td>
+                        <Td right>{fmtStock(i, qtyAt(i))}</Td>
+                        <Td right>{fmtRM(qtyAt(i) * i.lastCostPerUnit)}</Td>
+                        <Td right>{i.stock > 0 ? `${((qtyAt(i) / i.stock) * 100).toFixed(0)}%` : "—"}</Td>
+                        <Td>
+                          <button
+                            onClick={() => setTransferItem(i)}
+                            className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
+                          >
+                            Split / transfer
+                          </button>
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card>
+          </div>
+        );
+      })()}
 
       {tab === "Allocations" && (
         <Card title="Allocation history — stock handed to farms">

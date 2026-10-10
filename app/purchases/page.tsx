@@ -5,12 +5,13 @@ import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, MonthSelect, EmptyState, ConfirmDialog } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, purchaseTotal, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { Purchase, PurchaseLine, StockAllocation } from "@/lib/types";
-import { packSizeOf, fmtStock } from "@/lib/stock";
+import { packSizeOf, fmtStock, mainBalance } from "@/lib/stock";
 
 export default function PurchasesPage() {
   const { db, update, setDB } = useStore();
   const [showPurchase, setShowPurchase] = useState(false);
   const [deletePurchase, setDeletePurchase] = useState<Purchase | null>(null);
+  const [splitPurchase, setSplitPurchase] = useState<Purchase | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const months = lastNMonthKeys(12).reverse();
   const [month, setMonth] = useState(
@@ -160,6 +161,14 @@ export default function PurchasesPage() {
                     )}
                   </Td>
                   <Td>
+                    {p.lines.some((l) => l.itemId) && (
+                      <button
+                        onClick={() => setSplitPurchase(p)}
+                        className="mr-1 rounded-full border border-accent/40 px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
+                      >
+                        Split to farms
+                      </button>
+                    )}
                     <button
                       onClick={() => setDeletePurchase(p)}
                       className="rounded-full px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
@@ -176,6 +185,7 @@ export default function PurchasesPage() {
       </Card>
 
       {showPurchase && <PurchaseForm onClose={() => setShowPurchase(false)} />}
+      {splitPurchase && <SplitPurchaseForm purchase={splitPurchase} onClose={() => setSplitPurchase(null)} />}
       {deletePurchase && (
         <ConfirmDialog
           title="Delete this purchase?"
@@ -426,6 +436,11 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
                   ✕
                 </button>
               </div>
+                {!item && l.invoiceName.trim() && (
+                  <p className="mt-1.5 text-xs text-muted">
+                    Not linked to a stock item — pick one on the right (→) to add it to inventory and split it between farms.
+                  </p>
+                )}
                 {item && (
                   <div className="mt-2 rounded-xl border border-hairline bg-surface-2 p-3 text-xs">
                     <p className="text-ink-2">
@@ -460,6 +475,7 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
                         </button>
                       </div>
                     ))}
+                    <p className="mt-2 font-medium text-ink-2">Split between farms (optional — whatever you don&apos;t split stays in Main):</p>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <button
                         onClick={() =>
@@ -472,7 +488,7 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
                         }
                         className="text-accent hover:underline"
                       >
-                        + Split to a farm
+                        + Add a farm
                       </button>
                       <span className={allocated(l) > received(l) + 1e-9 ? "font-medium text-critical" : "text-muted"}>
                         Allocated {allocated(l).toLocaleString()} {item.unit} · balance in Main{" "}
@@ -519,6 +535,115 @@ function PurchaseForm({ onClose }: { onClose: () => void }) {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit}>Save Purchase</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Hand part of an already-saved purchase to farms - for splitting later, or for purchases made before splitting existed. */
+function SplitPurchaseForm({ purchase, onClose }: { purchase: Purchase; onClose: () => void }) {
+  const { db, setDB } = useStore();
+  const itemIds = [...new Set(purchase.lines.map((l) => l.itemId).filter(Boolean) as string[])];
+  const [splits, setSplits] = useState<Record<string, DraftSplit[]>>(() => {
+    const first = db.farms[0]?.id ?? "";
+    return Object.fromEntries(itemIds.map((id) => [id, [{ key: `${id}-1`, farmId: first, quantity: "" }]]));
+  });
+
+  const rows = itemIds.map((id) => {
+    const item = db.items.find((i) => i.id === id)!;
+    const received = purchase.lines.filter((l) => l.itemId === id).reduce((s, l) => s + l.quantity * packSizeOf(item), 0);
+    const given = (db.allocations ?? []).filter((a) => a.purchaseId === purchase.id && a.itemId === id).reduce((s, a) => s + a.quantity, 0);
+    const available = Math.max(0, Math.min(received - given, mainBalance(item)));
+    const draft = (splits[id] ?? []).reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+    return { id, item, received, given, available, draft };
+  });
+  const invalid = rows.some((r) => r.draft > r.available + 1e-9);
+  const nothing = rows.every((r) => r.draft <= 0);
+
+  const setRow = (id: string, next: DraftSplit[]) => setSplits((s) => ({ ...s, [id]: next }));
+
+  const submit = () => {
+    if (invalid || nothing) return;
+    const date = TODAY.toISOString().slice(0, 10);
+    setDB((prev) => {
+      const added: StockAllocation[] = [];
+      const items = prev.items.map((item) => {
+        const mine = (splits[item.id] ?? []).filter((x) => x.farmId && Number(x.quantity) > 0);
+        if (mine.length === 0) return item;
+        const farmStock = { ...(item.farmStock ?? {}) };
+        for (const x of mine) {
+          const q = Number(x.quantity);
+          farmStock[x.farmId] = Number(((farmStock[x.farmId] ?? 0) + q).toFixed(3));
+          added.push({ id: newId("al"), date, itemId: item.id, farmId: x.farmId, quantity: q, unitCost: item.lastCostPerUnit, purchaseId: purchase.id, kind: "purchase" });
+        }
+        return { ...item, farmStock };
+      });
+      return { ...prev, items, allocations: [...(prev.allocations ?? []), ...added] };
+    });
+    onClose();
+  };
+
+  return (
+    <Modal title="Split this purchase between farms" onClose={onClose} wide>
+      <div className="space-y-5">
+        {rows.map(({ id, item, received, given, available, draft }) => (
+          <div key={id} className="rounded-xl border border-hairline p-4">
+            <p className="font-medium text-ink">{item.name}</p>
+            <p className="mt-1 text-xs text-muted">
+              Received {received.toLocaleString()} {item.unit} · already split {given.toLocaleString()} {item.unit} · can still split{" "}
+              <span className="font-medium text-ink-2">{available.toLocaleString()} {item.unit}</span> (Main holds {mainBalance(item).toLocaleString()} {item.unit})
+            </p>
+            {(splits[id] ?? []).map((sp) => (
+              <div key={sp.key} className="mt-3 flex items-center gap-2">
+                <select
+                  value={sp.farmId}
+                  onChange={(e) => setRow(id, (splits[id] ?? []).map((x) => (x.key === sp.key ? { ...x, farmId: e.target.value } : x)))}
+                  className="rounded-lg border border-hairline bg-surface px-2 py-2 text-sm"
+                >
+                  {db.farms.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={sp.quantity}
+                  onChange={(e) => setRow(id, (splits[id] ?? []).map((x) => (x.key === sp.key ? { ...x, quantity: e.target.value } : x)))}
+                  placeholder={item.unit}
+                  className="w-28 rounded-lg border border-hairline bg-surface px-2 py-2 text-sm tnum"
+                />
+                <span className="text-sm text-muted">{item.unit}</span>
+                <button
+                  onClick={() => setRow(id, (splits[id] ?? []).filter((x) => x.key !== sp.key))}
+                  className="text-muted hover:text-critical"
+                  aria-label="Remove farm split"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+              <button
+                onClick={() =>
+                  setRow(id, [
+                    ...(splits[id] ?? []),
+                    { key: `${id}-${Date.now()}`, farmId: db.farms.find((f) => !(splits[id] ?? []).some((x) => x.farmId === f.id))?.id ?? db.farms[0]?.id ?? "", quantity: "" },
+                  ])
+                }
+                className="text-accent hover:underline"
+              >
+                + Add a farm
+              </button>
+              <span className={draft > available + 1e-9 ? "font-medium text-critical" : "text-muted"}>
+                Splitting {draft.toLocaleString()} {item.unit} · {Math.max(0, available - draft).toLocaleString()} {item.unit} stays in Main
+                {draft > available + 1e-9 ? " — more than available" : ""}
+              </span>
+            </div>
+          </div>
+        ))}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit}>Save split</Button>
         </div>
       </div>
     </Modal>
