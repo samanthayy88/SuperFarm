@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Table, Th, Td, Button, Modal, Field, TextInput, EmptyState, ConfirmDialog, Badge } from "@/components/ui";
-import { ExpenseCategory } from "@/lib/types";
+import { ExpenseCategory, InventoryItem } from "@/lib/types";
+import ItemForm from "@/components/ItemForm";
 
 export default function ExpenseCategoriesPage() {
   const { db } = useStore();
   const [form, setForm] = useState<{ mode: "add" } | { mode: "edit"; cat: ExpenseCategory } | null>(null);
   const [del, setDel] = useState<ExpenseCategory | null>(null);
+  const [subForm, setSubForm] = useState<{ category: string; item?: InventoryItem } | null>(null);
 
   const usage = (c: ExpenseCategory) => {
     const items = db.items.filter((i) => i.category === c.name).length;
@@ -20,7 +22,7 @@ export default function ExpenseCategoriesPage() {
     <div>
       <PageHeader
         title="Expense Category"
-        subtitle="The categories you pick on each purchase line and stock item — fertilizer, pesticide, tools and so on"
+        subtitle="Categories and their sub-categories. A sub-category is the standard product — pick it on a purchase or spray round and the same product is recorded whatever name the supplier prints on the invoice"
         actions={<Button onClick={() => setForm({ mode: "add" })}>+ Add Category</Button>}
       />
       <Card>
@@ -31,6 +33,7 @@ export default function ExpenseCategoriesPage() {
             <thead>
               <tr>
                 <Th>Category</Th>
+                <Th>Sub-categories (standard products)</Th>
                 <Th>Costing</Th>
                 <Th right>Used in</Th>
                 <Th />
@@ -42,6 +45,26 @@ export default function ExpenseCategoriesPage() {
                 return (
                   <tr key={c.id}>
                     <Td className="font-medium text-ink">{c.name}</Td>
+                    <Td>
+                      <div className="flex w-[28rem] max-w-full flex-wrap items-center gap-1.5">
+                        {db.items.filter((i) => i.category === c.name).map((i) => (
+                          <button
+                            key={i.id}
+                            onClick={() => setSubForm({ category: c.name, item: i })}
+                            title="Edit sub-category"
+                            className="rounded-full border border-hairline bg-surface-2 px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-accent/40 hover:text-accent"
+                          >
+                            {i.name}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setSubForm({ category: c.name })}
+                          className="rounded-full px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
+                        >
+                          + Add sub-category
+                        </button>
+                      </div>
+                    </Td>
                     <Td>
                       {c.durable ? (
                         <Badge tone="accent">Charged when given to a farm</Badge>
@@ -74,6 +97,7 @@ export default function ExpenseCategoriesPage() {
         )}
       </Card>
       {form && <CategoryForm cat={form.mode === "edit" ? form.cat : undefined} onClose={() => setForm(null)} />}
+      {subForm && <ItemForm item={subForm.item} presetCategory={subForm.category} onClose={() => setSubForm(null)} />}
       {del && <DeleteCategory cat={del} inUse={usage(del).total} onClose={() => setDel(null)} />}
     </div>
   );

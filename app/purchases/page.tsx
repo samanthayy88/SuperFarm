@@ -229,7 +229,7 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
   const [receipt, setReceipt] = useState<{ name: string; dataUrl?: string } | null>(
     purchase?.receiptName || purchase?.receiptDataUrl ? { name: purchase.receiptName ?? "Receipt", dataUrl: purchase.receiptDataUrl } : null
   );
-  const [itemForm, setItemForm] = useState<{ lineKey: string; item?: InventoryItem } | null>(null);
+  const [itemForm, setItemForm] = useState<{ lineKey: string; item?: InventoryItem; category?: string } | null>(null);
   const [form, setForm] = useState({
     date: purchase?.date ?? TODAY.toISOString().slice(0, 10),
     supplierId: purchase?.supplierId ?? db.suppliers[0]?.id ?? "",
@@ -464,8 +464,8 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
 
           <div>
             <p className="mb-2 text-xs font-medium text-muted">
-              Line items — type the name as printed on the invoice, say how it was packed, then link it to a stock item (leave unlinked
-              for one-time purchases)
+              Line items — type the name as printed on the invoice, say how it was packed, then choose its category and sub-category so the
+              same product is recorded whatever the vendor calls it (leave unlinked for one-time purchases)
             </p>
             <div className="hidden grid-cols-[minmax(0,2fr)_80px_130px_170px_110px_28px] gap-2 px-1 pb-1 text-[11px] font-medium tracking-wide text-muted lg:grid">
               <span>Name on invoice</span>
@@ -560,7 +560,11 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <select
                         value={l.category}
-                        onChange={(e) => setLine(l.key, { category: e.target.value })}
+                        onChange={(e) => {
+                          // a sub-category belongs to one category, so changing category drops a link to another one
+                          const keep = item && item.category === e.target.value;
+                          setLine(l.key, { category: e.target.value, ...(keep ? {} : { itemId: undefined, splits: undefined }) });
+                        }}
                         className={lineClass}
                         aria-label="Expense category"
                       >
@@ -573,19 +577,21 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
                         value={l.itemId ?? ""}
                         onChange={(e) => linkItem(l.key, db.items.find((i) => i.id === e.target.value))}
                         className={`${lineClass} min-w-48 flex-1`}
-                        aria-label="Stock item"
+                        aria-label="Sub-category"
                       >
-                        <option value="">One-time — do not stock</option>
-                        {db.items.map((i) => (
+                        <option value="">
+                          {db.items.some((i) => i.category === l.category) ? "Sub-category — or one-time, do not stock" : "No sub-category yet — one-time, do not stock"}
+                        </option>
+                        {db.items.filter((i) => i.category === l.category).map((i) => (
                           <option key={i.id} value={i.id}>→ {i.name}</option>
                         ))}
                       </select>
-                      <button onClick={() => setItemForm({ lineKey: l.key })} className="text-xs font-medium text-accent hover:underline">
-                        + New item
+                      <button onClick={() => setItemForm({ lineKey: l.key, category: l.category })} className="text-xs font-medium text-accent hover:underline">
+                        + New sub-category
                       </button>
                       {item && (
                         <button onClick={() => setItemForm({ lineKey: l.key, item })} className="text-xs font-medium text-accent hover:underline">
-                          Edit item
+                          Edit
                         </button>
                       )}
                       <span className="ml-auto text-xs text-muted tnum">
@@ -598,7 +604,8 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
 
                     {!item && l.invoiceName.trim() && (
                       <p className="mt-2 text-xs text-muted">
-                        Not linked to a stock item — pick one above (→) or add a new item to put it in inventory and split it between farms.
+                        Not linked to a sub-category — pick one above (→) or add a new sub-category to put it in inventory and split it between
+                        farms. Pick the same sub-category whatever name this vendor prints.
                       </p>
                     )}
                     {item && (
@@ -701,6 +708,7 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
       {itemForm && (
         <ItemForm
           item={itemForm.item}
+          presetCategory={itemForm.category}
           onClose={() => setItemForm(null)}
           onSaved={(saved) => linkItem(itemForm.lineKey, saved)}
         />

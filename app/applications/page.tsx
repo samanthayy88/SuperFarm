@@ -198,6 +198,8 @@ export default function ApplicationsPage() {
 }
 
 interface DraftProduct extends ApplicationProduct {
+  /** Expense category used to narrow the product list; not stored on the record. */
+  category: string;
   key: string;
 }
 
@@ -212,7 +214,7 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
     notes: "",
   });
   const [products, setProducts] = useState<DraftProduct[]>([
-    { key: "1", itemId: db.items[0]?.id ?? "", ratePer100L: 0, quantityUsed: 0, unitCost: db.items[0]?.lastCostPerUnit ?? 0 },
+    { key: "1", category: db.items[0]?.category ?? "", itemId: db.items[0]?.id ?? "", ratePer100L: 0, quantityUsed: 0, unitCost: db.items[0]?.lastCostPerUnit ?? 0 },
   ]);
 
   const plots = db.plots.filter((p) => p.farmId === form.farmId);
@@ -239,7 +241,7 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
       plotId,
       target: form.target,
       waterVolumeL: water,
-      products: valid.map(({ key, ...p }) => p), // eslint-disable-line @typescript-eslint/no-unused-vars
+      products: valid.map(({ key, category, ...p }) => p), // eslint-disable-line @typescript-eslint/no-unused-vars
       notes: form.notes || undefined,
     };
     update("applications", (list) => [...list, a]);
@@ -306,7 +308,7 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
             Tank mix — enter the dose rate per 100 L and the quantity is calculated from the water volume
           </p>
           <div className="mb-1 grid grid-cols-[1fr_100px_100px_100px_90px_28px] gap-2 text-xs text-muted">
-            <span>Product</span>
+            <span>Category › Sub-category</span>
             <span>Rate /100L</span>
             <span>Qty used</span>
             <span>Cost/unit</span>
@@ -318,18 +320,37 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
               const item = db.items.find((i) => i.id === p.itemId);
               return (
                 <div key={p.key} className="grid grid-cols-[1fr_100px_100px_100px_90px_28px] items-center gap-2">
-                  <select
-                    value={p.itemId}
-                    onChange={(e) => {
-                      const it = db.items.find((i) => i.id === e.target.value);
-                      setProduct(p.key, { itemId: e.target.value, unitCost: it?.lastCostPerUnit ?? 0 });
-                    }}
-                    className="rounded border border-hairline bg-surface-2 px-2 py-2 text-sm"
-                  >
-                    {db.items.map((i) => (
-                      <option key={i.id} value={i.id}>{i.name}</option>
-                    ))}
-                  </select>
+                  <div className="flex min-w-0 gap-1">
+                    <select
+                      value={p.category}
+                      onChange={(e) => {
+                        // narrowing to another category picks that category's first product
+                        const first = db.items.find((i) => i.category === e.target.value);
+                        setProduct(p.key, { category: e.target.value, itemId: first?.id ?? "", unitCost: first?.lastCostPerUnit ?? 0 });
+                      }}
+                      aria-label="Category"
+                      className="w-2/5 min-w-0 rounded border border-hairline bg-surface-2 px-2 py-2 text-sm"
+                    >
+                      {[...new Set([...db.expenseCategories.map((c) => c.name), ...db.items.map((i) => i.category)])]
+                        .filter((c) => db.items.some((i) => i.category === c) && !db.expenseCategories.find((x) => x.name === c)?.durable)
+                        .map((c) => (
+                          <option key={c}>{c}</option>
+                        ))}
+                    </select>
+                    <select
+                      value={p.itemId}
+                      onChange={(e) => {
+                        const it = db.items.find((i) => i.id === e.target.value);
+                        setProduct(p.key, { itemId: e.target.value, unitCost: it?.lastCostPerUnit ?? 0 });
+                      }}
+                      aria-label="Sub-category"
+                      className="min-w-0 flex-1 rounded border border-hairline bg-surface-2 px-2 py-2 text-sm"
+                    >
+                      {db.items.filter((i) => i.category === p.category).map((i) => (
+                        <option key={i.id} value={i.id}>{i.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <input
                     type="number"
                     step="0.01"
@@ -381,7 +402,7 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
             onClick={() =>
               setProducts([
                 ...products,
-                { key: String(Date.now()), itemId: db.items[0]?.id ?? "", ratePer100L: 0, quantityUsed: 0, unitCost: db.items[0]?.lastCostPerUnit ?? 0 },
+                { key: String(Date.now()), category: db.items[0]?.category ?? "", itemId: db.items[0]?.id ?? "", ratePer100L: 0, quantityUsed: 0, unitCost: db.items[0]?.lastCostPerUnit ?? 0 },
               ])
             }
             className="mt-2 text-xs text-accent hover:underline"
