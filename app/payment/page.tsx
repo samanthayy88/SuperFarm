@@ -18,6 +18,7 @@ import {
   ConfirmDialog,
 } from "@/components/ui";
 import { fmtRM, fmtRM0, fmtDate, currentMonthKey } from "@/lib/utils";
+import MonthlyDues from "@/components/MonthlyDues";
 import DateRangeFilter, { DateRange, monthRange, inDateRange, rangeLabel } from "@/components/DateRangeFilter";
 import { Payment, PaymentCategory } from "@/lib/types";
 
@@ -52,6 +53,8 @@ export default function PaymentPage() {
           </>
         }
       />
+
+      <MonthlyDues />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard label={`Total payments — ${label}`} value={fmtRM0(totalSpent)} />
