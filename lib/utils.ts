@@ -89,6 +89,27 @@ export function unpaidRentMonths(c: RentalContract): string[] {
   return out;
 }
 
+/**
+ * Flip a month between paid and unpaid on a loan or rental contract. Marking a
+ * current or future month paid stamps today's date (that's when the money went
+ * out); a past month is a catch-up tick so it takes the 1st of that month,
+ * which can be corrected from the Payment record. Unticking drops the date.
+ */
+export function withPaidToggled<T extends { paidMonths: string[]; paidDates?: Record<string, string> }>(item: T, month: string): T {
+  const dates = { ...(item.paidDates ?? {}) };
+  if (item.paidMonths.includes(month)) {
+    delete dates[month];
+    return { ...item, paidMonths: item.paidMonths.filter((m) => m !== month), paidDates: dates };
+  }
+  dates[month] = month >= currentMonthKey() ? todayLocalISO() : `${month}-01`;
+  return { ...item, paidMonths: [...item.paidMonths, month], paidDates: dates };
+}
+
+/** The date a month's rent or installment was paid — recorded date, else the 1st of the month. */
+export function paidDateOf(item: { paidDates?: Record<string, string> }, month: string): string {
+  return item.paidDates?.[month] ?? `${month}-01`;
+}
+
 /** An expired term that a later term on the same farm has replaced, i.e. it was renewed. */
 export function isRenewed(c: RentalContract, all: RentalContract[]): boolean {
   return contractStatus(c) === "Expired" && all.some((o) => o.farmId === c.farmId && o.startDate > c.startDate);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { Card, Badge, Button, Table, Th, Td, MonthSelect, EmptyState } from "@/components/ui";
-import { fmtRM, fmtRM0, currentMonthKey, monthLabel, lastNMonthKeys, loanMonthWithinTenure, unpaidLoanMonths, unpaidRentMonths } from "@/lib/utils";
+import { fmtRM, fmtRM0, withPaidToggled, currentMonthKey, monthLabel, lastNMonthKeys, loanMonthWithinTenure, unpaidLoanMonths, unpaidRentMonths } from "@/lib/utils";
 
 interface Due {
   key: string;
@@ -80,21 +80,9 @@ export default function MonthlyDues() {
 
   const toggle = (d: Due) => {
     if (d.kind === "loan") {
-      update("loans", (list) =>
-        list.map((l) =>
-          l.id === d.id
-            ? { ...l, paidMonths: l.paidMonths.includes(month) ? l.paidMonths.filter((x) => x !== month) : [...l.paidMonths, month] }
-            : l
-        )
-      );
+      update("loans", (list) => list.map((l) => (l.id === d.id ? withPaidToggled(l, month) : l)));
     } else {
-      update("contracts", (list) =>
-        list.map((c) =>
-          c.id === d.id
-            ? { ...c, paidMonths: c.paidMonths.includes(month) ? c.paidMonths.filter((x) => x !== month) : [...c.paidMonths, month] }
-            : c
-        )
-      );
+      update("contracts", (list) => list.map((c) => (c.id === d.id ? withPaidToggled(c, month) : c)));
     }
   };
 
@@ -136,7 +124,7 @@ export default function MonthlyDues() {
           Remember to include the loan repayments from{" "}
           <Link href="/loans" className="underline">Borrowings</Link> and the rent from{" "}
           <Link href="/contracts" className="underline">Rental Contracts</Link>{" "}
-          when you do this month&apos;s payments. Tick them off here once paid — it updates both pages.
+          when you do this month&apos;s payments. Tick them off here once paid — they then appear in the payment records below (counted once) and update both pages.
         </p>
       </div>
 

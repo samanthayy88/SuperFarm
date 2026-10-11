@@ -90,6 +90,8 @@ export interface RentalContract {
   depositPaid: number;
   notes?: string;
   paidMonths: string[]; // "2026-07" months where rent was paid
+  /** Date each month's rent was paid ("2026-07" → ISO date), for the Payment record. Falls back to the 1st of the month. */
+  paidDates?: Record<string, string>;
 }
 
 // ---------- Loans ----------
@@ -103,6 +105,8 @@ export interface Loan {
   startDate: string;
   tenureMonths: number;
   paidMonths: string[]; // "2026-07"
+  /** Date each month's installment was paid ("2026-07" → ISO date), for the Payment record. Falls back to the 1st of the month. */
+  paidDates?: Record<string, string>;
   /**
    * Known outstanding balance as of `balanceAsOfDate`, for a loan added to the
    * dashboard partway through repayment — overrides the principal-minus-paid-

@@ -10,6 +10,7 @@ import {
   contractStatus,
   unpaidRentMonths,
   currentMonthKey,
+  withPaidToggled,
   monthLabel,
   lastNMonthKeys,
   daysBetween,
@@ -48,18 +49,7 @@ export default function ContractsPage() {
   const expiringCount = currentContracts.filter((c) => contractStatus(c) !== "Active").length;
 
   const togglePaid = (contractId: string, month: string) => {
-    update("contracts", (list) =>
-      list.map((c) =>
-        c.id === contractId
-          ? {
-              ...c,
-              paidMonths: c.paidMonths.includes(month)
-                ? c.paidMonths.filter((m) => m !== month)
-                : [...c.paidMonths, month],
-            }
-          : c
-      )
-    );
+    update("contracts", (list) => list.map((c) => (c.id === contractId ? withPaidToggled(c, month) : c)));
   };
 
   const recentMonths = lastNMonthKeys(6);

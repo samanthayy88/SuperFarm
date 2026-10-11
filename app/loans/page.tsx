@@ -13,6 +13,7 @@ import {
   loanMonthWithinTenure,
   loanEffectiveStart,
   currentMonthKey,
+  withPaidToggled,
   monthLabel,
   lastNMonthKeys,
   TODAY,
@@ -38,18 +39,7 @@ export default function LoansPage() {
   const unpaidCount = db.loans.filter((l) => loanMonthWithinTenure(l, month) && !l.paidMonths.includes(month)).length;
 
   const togglePaid = (loanId: string, m: string) => {
-    update("loans", (list) =>
-      list.map((l) =>
-        l.id === loanId
-          ? {
-              ...l,
-              paidMonths: l.paidMonths.includes(m)
-                ? l.paidMonths.filter((x) => x !== m)
-                : [...l.paidMonths, m],
-            }
-          : l
-      )
-    );
+    update("loans", (list) => list.map((l) => (l.id === loanId ? withPaidToggled(l, m) : l)));
   };
 
   return (
