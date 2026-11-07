@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
 import { Modal, Field, TextInput, Select, Button, ConfirmDialog } from "@/components/ui";
 import { InventoryItem } from "@/lib/types";
-import { allocatedTotal, packSizeOf } from "@/lib/stock";
+import { allocatedTotal } from "@/lib/stock";
 
 /** Add or edit a stock item. `onSaved` receives the saved item (used to link a purchase line to a new item). */
 export default function ItemForm({
@@ -29,11 +29,9 @@ export default function ItemForm({
     category: item?.category ?? presetCategory ?? categories[0]?.name ?? "Other",
     unit: item?.unit ?? measures[0]?.name ?? "kg",
     packLabel: item?.packLabel ?? "",
-    packSize: item ? String(packSizeOf(item)) : "1",
     minStock: item ? String(item.minStock) : "0",
     stock: item ? String(item.stock) : "",
   });
-  const size = Number(form.packSize) || 1;
   const newStock = Number(form.stock) || 0;
   const minAllowed = item ? allocatedTotal(item) : 0;
   const stockTooLow = Boolean(item) && newStock < minAllowed - 1e-9;
@@ -45,7 +43,6 @@ export default function ItemForm({
       category: form.category,
       unit: form.unit,
       packLabel: form.packLabel || undefined,
-      packSize: size,
       minStock: Number(form.minStock) || 0,
       trackInventory: true,
     };
@@ -54,7 +51,7 @@ export default function ItemForm({
       update("items", (list) => list.map((i) => (i.id === item.id ? saved : i)));
       onSaved?.(saved);
     } else {
-      const saved: InventoryItem = { id: newId("i"), stock: 0, lastCostPerUnit: 0, aliases: [], farmStock: {}, ...payload };
+      const saved: InventoryItem = { id: newId("i"), stock: 0, packSize: 1, lastCostPerUnit: 0, aliases: [], farmStock: {}, ...payload };
       update("items", (list) => [...list, saved]);
       onSaved?.(saved);
     }
@@ -93,14 +90,9 @@ export default function ItemForm({
               {form.packLabel && !packs.some((u) => u.name === form.packLabel) && <option>{form.packLabel}</option>}
             </Select>
           </Field>
-          <Field label={`${form.unit} in one pack`}>
-            <TextInput type="number" value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} />
-          </Field>
         </div>
         <p className="text-xs text-muted">
-          {size > 1
-            ? `Buying 1 ${form.packLabel || "pack"} adds ${size} ${form.unit} to stock, and you can split it between farms in ${form.unit}. You can still change the pack size on each purchase line.`
-            : `Stock is counted one ${form.unit} at a time.`}
+          Stock is counted in {form.unit}. The pack size (e.g. 250ml, 500ml, 1L, 4L) is entered on each purchase line, since the same product comes in different sizes.
         </p>
         <Field label={`Minimum level (${form.unit}) — reorder alert`}>
           <TextInput type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
