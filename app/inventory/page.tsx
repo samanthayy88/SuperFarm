@@ -11,7 +11,7 @@ import { isAbItem } from "@/lib/ab";
 import { consumeStock, transferStock, farmBalance, mainBalance, fmtStock, packSizeOf } from "@/lib/stock";
 
 export default function InventoryPage() {
-  const { db, update } = useStore();
+  const { db } = useStore();
   const [tab, setTab] = useState("Inventory");
   const [showUsage, setShowUsage] = useState(false);
   const [itemForm, setItemForm] = useState<{ item?: InventoryItem } | null>(null);
@@ -336,10 +336,7 @@ export default function InventoryPage() {
         <DeleteItem
           item={deleteTarget}
           onCancel={() => setDeleteTarget(null)}
-          onDeleted={() => {
-            update("items", (list) => list.filter((x) => x.id !== deleteTarget.id));
-            setDeleteTarget(null);
-          }}
+          onDone={() => setDeleteTarget(null)}
         />
       )}
       {transferItem && <TransferForm item={transferItem} onClose={() => setTransferItem(null)} />}

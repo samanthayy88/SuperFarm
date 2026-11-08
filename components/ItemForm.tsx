@@ -131,10 +131,7 @@ export default function ItemForm({
           <DeleteItem
             item={item}
             onCancel={() => setConfirmDelete(false)}
-            onDeleted={() => {
-              update("items", (list) => list.filter((i) => i.id !== item.id));
-              onClose();
-            }}
+            onDone={onClose}
           />
         )}
       </div>
@@ -142,35 +139,61 @@ export default function ItemForm({
   );
 }
 
-/** Deleting a sub-category is only safe once nothing refers to it and no stock is left. */
-export function DeleteItem({ item, onCancel, onDeleted }: { item: InventoryItem; onCancel: () => void; onDeleted: () => void }) {
-  const { db } = useStore();
+/**
+ * Delete a sub-category. A clean one goes after a simple confirm; one that still has stock or records
+ * can be force-deleted after the consequences are listed. `onDone` runs once it is gone.
+ */
+export function DeleteItem({ item, onCancel, onDone }: { item: InventoryItem; onCancel: () => void; onDone: () => void }) {
+  const { db, setDB } = useStore();
   const lines = db.purchases.reduce((n, p) => n + p.lines.filter((l) => l.itemId === item.id).length, 0);
   const rounds = db.applications.filter((a) => a.products.some((p) => p.itemId === item.id)).length;
   const usage = db.usageLogs.filter((u) => u.itemId === item.id).length;
-  const reasons: string[] = [];
-  if (item.stock > 0) reasons.push(`${item.stock.toLocaleString()} ${item.unit} is still in stock`);
-  if (lines) reasons.push(`${lines} purchase line(s) use it`);
-  if (rounds) reasons.push(`${rounds} spray round(s) use it`);
-  if (usage) reasons.push(`${usage} usage record(s) use it`);
+  const moves = (db.allocations ?? []).filter((a) => a.itemId === item.id).length;
+  const impacts: string[] = [];
+  if (item.stock > 0) impacts.push(`${item.stock.toLocaleString()} ${item.unit} of stock on hand is written off (Main and farms)`);
+  if (usage) impacts.push(`${usage} usage record(s) are deleted, so that cost leaves costing`);
+  if (moves) impacts.push(`${moves} farm transfer record(s) are deleted`);
+  if (lines) impacts.push(`${lines} purchase line(s) stay on their receipts but are unlinked, so they count as one-time purchases in costing`);
+  if (rounds) impacts.push(`${rounds} spray round(s) keep their recorded cost, but show “—” for this product`);
 
-  if (reasons.length > 0)
+  const remove = () => {
+    setDB((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => i.id !== item.id),
+      usageLogs: prev.usageLogs.filter((u) => u.itemId !== item.id),
+      allocations: (prev.allocations ?? []).filter((a) => a.itemId !== item.id),
+      purchases: prev.purchases.map((p) =>
+        p.lines.some((l) => l.itemId === item.id)
+          ? { ...p, lines: p.lines.map((l) => (l.itemId === item.id ? { ...l, itemId: undefined } : l)) }
+          : p
+      ),
+    }));
+    onDone();
+  };
+
+  if (impacts.length === 0)
     return (
-      <Modal title={`Can't delete “${item.name}”`} onClose={onCancel}>
-        <p className="text-sm text-ink-2">It can only be removed when nothing refers to it: {reasons.join("; ")}.</p>
-        <p className="mt-2 text-xs text-muted">Rename it, or point those records at a different sub-category first.</p>
-        <div className="mt-4 flex justify-end">
-          <Button onClick={onCancel}>OK</Button>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        title={`Delete “${item.name}”?`}
+        message="Nothing uses this sub-category and no stock is held, so nothing else changes."
+        confirmLabel="Delete sub-category"
+        onConfirm={remove}
+        onClose={onCancel}
+      />
     );
   return (
-    <ConfirmDialog
-      title={`Delete “${item.name}”?`}
-      message="Nothing uses this sub-category and no stock is held, so nothing else changes."
-      confirmLabel="Delete sub-category"
-      onConfirm={onDeleted}
-      onClose={onCancel}
-    />
+    <Modal title={`Delete “${item.name}” anyway?`} onClose={onCancel}>
+      <p className="text-sm text-ink-2">This sub-category is still in use. If you delete it:</p>
+      <ul className="mt-2 space-y-1 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2.5">
+        {impacts.map((t) => (
+          <li key={t} className="text-xs text-critical">• {t}</li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted">This cannot be undone.</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button variant="danger" onClick={remove}>Delete anyway</Button>
+      </div>
+    </Modal>
   );
 }
