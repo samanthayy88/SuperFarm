@@ -6,6 +6,7 @@ import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput
 import { fmtRM, fmtRM0, fmtDate, purchaseTotal, currentMonthKey, TODAY } from "@/lib/utils";
 import DateRangeFilter, { DateRange, monthRange, inDateRange, rangeLabel } from "@/components/DateRangeFilter";
 import { Purchase, StockAllocation, InventoryItem } from "@/lib/types";
+import { isAbItem } from "@/lib/ab";
 import { packSizeOf, mainBalance, lineBaseQty, reversePurchase } from "@/lib/stock";
 import ItemForm from "@/components/ItemForm";
 
@@ -585,7 +586,7 @@ function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () 
                         <option value="">
                           {db.items.some((i) => i.category === l.category) ? "Sub-category — or one-time, do not stock" : "No sub-category yet — one-time, do not stock"}
                         </option>
-                        {db.items.filter((i) => i.category === l.category).map((i) => (
+                        {db.items.filter((i) => i.category === l.category && !isAbItem(i)).map((i) => (
                           <option key={i.id} value={i.id}>→ {i.name}</option>
                         ))}
                       </select>

@@ -5,6 +5,7 @@ import { DB } from "./types";
 import { seedDB } from "./seed";
 import { commissionRateFor } from "./utils";
 import { parseLegacyUnit } from "./stock";
+import { syncAbItem } from "./ab";
 
 const STORAGE_KEY = "farm-dashboard-db-v1";
 
@@ -114,7 +115,9 @@ function subscribe(cb: () => void) {
   return () => listeners.delete(cb);
 }
 
-function commit(next: DB) {
+function commit(raw: DB) {
+  // the AB Fertilizers stock item always mirrors the AB sets, whichever page changed the data
+  const next = syncAbItem(raw);
   clientState = next;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));

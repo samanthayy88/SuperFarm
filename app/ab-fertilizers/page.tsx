@@ -16,12 +16,19 @@ import {
   setsDistributed,
   setsProduced,
   setsUsed,
+  syncAbItem,
   toBase,
   unitChoices,
   weightKg,
 } from "@/lib/ab";
 
 const r3 = (n: number) => Number(n.toFixed(3));
+
+/** `update` for the AB lists that also re-syncs the AB Fertilizers stock item. */
+function useAbUpdate(setDB: (fn: (prev: DB) => DB) => void) {
+  return <K extends "abDistributions" | "abUses">(key: K, fn: (list: DB[K]) => DB[K]) =>
+    setDB((prev) => syncAbItem({ ...prev, [key]: fn(prev[key]) }));
+}
 
 /** Products an AB mix can be made from: everything under Expense Category "Fertilizer" except AB Fertilizers itself. */
 function ingredientItems(db: DB): InventoryItem[] {
@@ -117,7 +124,9 @@ function PartEditor({ db, part, lines, onChange }: { db: DB; part: AbPart; lines
 }
 
 export default function AbFertilizersPage() {
-  const { db, update } = useStore();
+  const { db, setDB } = useStore();
+  /** Change one AB list, then keep the AB Fertilizers stock item in step. */
+  const update = useAbUpdate(setDB);
   const [tab, setTab] = useState("Batches");
   const [modal, setModal] = useState<"batch" | "distribute" | "use" | "recipe" | null>(null);
   const [del, setDel] = useState<{ kind: "batch" | "dist" | "use"; id: string } | null>(null);
@@ -135,11 +144,14 @@ export default function AbFertilizersPage() {
 
   /** Deleting a batch is only allowed while the sets it made are still unissued; its ingredients go back to stock. */
   const removeBatch = (b: AbBatch) => {
-    update("abBatches", (list) => list.filter((x) => x.id !== b.id));
-    update("items", (list) =>
-      list.map((i) => {
-        const back = b.lines.filter((l) => l.itemId === i.id).reduce((s, l) => s + l.perSet * b.sets, 0);
-        return back > 0 ? { ...i, stock: r3(i.stock + back) } : i;
+    setDB((prev) =>
+      syncAbItem({
+        ...prev,
+        abBatches: prev.abBatches.filter((x) => x.id !== b.id),
+        items: prev.items.map((i) => {
+          const back = b.lines.filter((l) => l.itemId === i.id).reduce((s, l) => s + l.perSet * b.sets, 0);
+          return back > 0 ? { ...i, stock: r3(i.stock + back) } : i;
+        }),
       })
     );
   };
@@ -445,11 +457,13 @@ function BatchForm({ onClose }: { onClose: () => void }) {
       totalCost: Number(cost.toFixed(2)),
       note: note.trim() || undefined,
     };
-    setDB((prev) => ({
-      ...prev,
-      abBatches: [...prev.abBatches, batch],
-      items: prev.items.map((i) => (need.has(i.id) ? consumeStock(i, undefined, need.get(i.id) ?? 0) : i)),
-    }));
+    setDB((prev) =>
+      syncAbItem({
+        ...prev,
+        abBatches: [...prev.abBatches, batch],
+        items: prev.items.map((i) => (need.has(i.id) ? consumeStock(i, undefined, need.get(i.id) ?? 0) : i)),
+      })
+    );
     onClose();
   };
 
@@ -502,7 +516,8 @@ function itemName(db: DB, id: string) {
 
 // ---------------- Distribute to a farm ----------------
 function DistributeForm({ onClose }: { onClose: () => void }) {
-  const { db, update } = useStore();
+  const { db, setDB } = useStore();
+  const update = useAbUpdate(setDB);
   const [date, setDate] = useState(todayLocalISO());
   const [farmId, setFarmId] = useState(db.farms[0]?.id ?? "");
   const [sets, setSets] = useState("");
@@ -545,7 +560,8 @@ function DistributeForm({ onClose }: { onClose: () => void }) {
 
 // ---------------- Record use ----------------
 function UseForm({ onClose }: { onClose: () => void }) {
-  const { db, update } = useStore();
+  const { db, setDB } = useStore();
+  const update = useAbUpdate(setDB);
   const [date, setDate] = useState(todayLocalISO());
   const [farmId, setFarmId] = useState(db.farms[0]?.id ?? "");
   const plots = db.plots.filter((p) => p.farmId === farmId);

@@ -1,5 +1,6 @@
 "use client";
 
+import { isAbItem } from "@/lib/ab";
 import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
@@ -346,7 +347,7 @@ function ApplicationForm({ onClose }: { onClose: () => void }) {
                       aria-label="Sub-category"
                       className="min-w-0 flex-1 rounded border border-hairline bg-surface-2 px-2 py-2 text-sm"
                     >
-                      {db.items.filter((i) => i.category === p.category).map((i) => (
+                      {db.items.filter((i) => i.category === p.category && !isAbItem(i)).map((i) => (
                         <option key={i.id} value={i.id}>{i.name}</option>
                       ))}
                     </select>

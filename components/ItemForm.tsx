@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useStore, newId } from "@/lib/store";
 import { Modal, Field, TextInput, Select, Button, ConfirmDialog } from "@/components/ui";
 import { InventoryItem } from "@/lib/types";
+import { isAbItem } from "@/lib/ab";
 import { allocatedTotal } from "@/lib/stock";
 
 /** Add or edit a stock item. `onSaved` receives the saved item (used to link a purchase line to a new item). */
@@ -97,7 +98,12 @@ export default function ItemForm({
         <Field label={`Minimum level (${form.unit}) — reorder alert`}>
           <TextInput type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
         </Field>
-        {item && (
+        {item && isAbItem(item) && (
+          <p className="text-xs text-muted">
+            Stock here follows the sets on the AB Fertilizers page (1 set = 20 kg of A + B), so it can&apos;t be edited by hand.
+          </p>
+        )}
+        {item && !isAbItem(item) && (
           <Field label={`Total stock on hand (${form.unit}) — change only to correct a miscount`}>
             <TextInput type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
           </Field>

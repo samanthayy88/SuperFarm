@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
 import { fmtRM, fmtDate, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { UsageLog, InventoryItem, StockAllocation } from "@/lib/types";
 import ItemForm from "@/components/ItemForm";
+import { isAbItem } from "@/lib/ab";
 import { consumeStock, transferStock, farmBalance, mainBalance, fmtStock, packSizeOf } from "@/lib/stock";
 
 export default function InventoryPage() {
@@ -95,12 +97,18 @@ export default function InventoryPage() {
                     </Td>
                     <Td>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setTransferItem(i)}
-                          className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
-                        >
-                          Split / transfer
-                        </button>
+                        {isAbItem(i) ? (
+                          <Link href="/ab-fertilizers" className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2">
+                            Manage sets
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => setTransferItem(i)}
+                            className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
+                          >
+                            Split / transfer
+                          </button>
+                        )}
                         <button
                           onClick={() => setItemForm({ item: i })}
                           className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
@@ -177,12 +185,18 @@ export default function InventoryPage() {
                         <Td right>{fmtRM(qtyAt(i) * i.lastCostPerUnit)}</Td>
                         <Td right>{i.stock > 0 ? `${((qtyAt(i) / i.stock) * 100).toFixed(0)}%` : "—"}</Td>
                         <Td>
-                          <button
-                            onClick={() => setTransferItem(i)}
-                            className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
-                          >
-                            Split / transfer
-                          </button>
+                          {isAbItem(i) ? (
+                            <Link href="/ab-fertilizers" className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2">
+                              Manage sets
+                            </Link>
+                          ) : (
+                            <button
+                              onClick={() => setTransferItem(i)}
+                              className="rounded-full border border-hairline px-3 py-1 text-xs text-accent transition-colors hover:bg-surface-2"
+                            >
+                              Split / transfer
+                            </button>
+                          )}
                         </Td>
                       </tr>
                     ))}
@@ -367,7 +381,7 @@ function UsageForm({ onClose }: { onClose: () => void }) {
   const { db, update } = useStore();
   const [form, setForm] = useState({
     date: TODAY.toISOString().slice(0, 10),
-    itemId: db.items[0]?.id ?? "",
+    itemId: db.items.find((i) => !isAbItem(i))?.id ?? "",
     quantity: "",
     purpose: "",
     farmId: db.farms[0]?.id ?? "",
@@ -399,7 +413,7 @@ function UsageForm({ onClose }: { onClose: () => void }) {
         </Field>
         <Field label="Item">
           <Select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
-            {db.items.map((i) => (
+            {db.items.filter((i) => !isAbItem(i)).map((i) => (
               <option key={i.id} value={i.id}>{i.name} ({fmtStock(i, i.stock)} in stock)</option>
             ))}
           </Select>

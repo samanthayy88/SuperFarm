@@ -1,4 +1,4 @@
-import { DB, AbBatch, AbUse } from "./types";
+import { DB, AbBatch, AbUse, InventoryItem } from "./types";
 
 const r3 = (n: number) => Number(n.toFixed(3));
 
@@ -60,4 +60,42 @@ export function fmtAmount(qty: number, unit: string): string {
 /** Weight of a list of ingredients in kg (only weight units count; others are ignored). */
 export function weightKg(lines: { qty: number; unit: string }[]): number {
   return r3(lines.reduce((s, l) => s + (toBase(l.qty, l.unit, "kg") ?? 0), 0));
+}
+
+/**
+ * The Stock Level item named "AB Fertilizers" mirrors the sets: its stock follows this page
+ * (1 set = 20 kg), so it is never edited by hand, bought, sprayed or transferred elsewhere.
+ */
+export function isAbItem(item: { name: string }): boolean {
+  return item.name.trim().toLowerCase() === "ab fertilizers";
+}
+
+export const AB_KG_PER_SET = AB_KG_PER_PART * 2;
+
+/** Brings the AB Fertilizers stock item in line with the set counts: on hand = made - used, farms hold given - used. */
+export function syncAbItem(db: DB): DB {
+  if (!db.items.some(isAbItem)) return db;
+  const farmStock: Record<string, number> = {};
+  for (const f of db.farms) {
+    const sets = farmSets(db, f.id);
+    if (sets > 0) farmStock[f.id] = r3(sets * AB_KG_PER_SET);
+  }
+  const cost = costPerSet(db);
+  return {
+    ...db,
+    items: db.items.map((i): InventoryItem =>
+      isAbItem(i)
+        ? {
+            ...i,
+            unit: "kg",
+            packSize: AB_KG_PER_SET,
+            packLabel: "set",
+            stock: r3((setsProduced(db) - setsUsed(db)) * AB_KG_PER_SET),
+            farmStock,
+            lastCostPerUnit: Number((cost / AB_KG_PER_SET).toFixed(4)),
+            trackInventory: true,
+          }
+        : i
+    ),
+  };
 }
