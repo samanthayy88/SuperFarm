@@ -28,6 +28,10 @@ export const seedDB: DB = {
     { id: "v5", cropId: "c4", name: "Clemson Spineless" },
   ],
 
+  abRecipe: { A: [], B: [] },
+  abBatches: [],
+  abDistributions: [],
+  abUses: [],
   settings: {
     appName: "Farm Manager",
     appSubtitle: "Multi-farm operations",

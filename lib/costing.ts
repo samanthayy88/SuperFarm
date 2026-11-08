@@ -1,4 +1,5 @@
 import { DB, Plot, PlotCycle, PLOT_STAGES } from "./types";
+import { abUseCost } from "./ab";
 import { applicationCost, saleKg, saleTotal, todayLocalISO } from "./utils";
 
 /**
@@ -253,6 +254,11 @@ export function seasonCosting(
       return s + u.quantity * (item?.lastCostPerUnit ?? 0) * acreShare(plot, pool);
     }, 0);
   add("Farm inputs", "Fertilizer & other stock used", stockUsed, "Allocated by acreage (farm chosen on the usage log)");
+  // AB Fertilizers cost reaches costing only when a set is actually used on the plot
+  const abUsed = (db.abUses ?? [])
+    .filter((u) => u.plotId === plotId && cropOk(u.cropId) && inRange(u.date, from, to))
+    .reduce((s, u) => s + abUseCost(db, u), 0);
+  add("Farm inputs", "AB Fertilizers used", abUsed, "Direct (sets used on this plot)");
   const toolsAllocated = (db.allocations ?? [])
     .filter((al) => al.farmId === plot.farmId && inRange(al.date, from, to) && durable(db.items.find((i) => i.id === al.itemId)?.category))
     .reduce((s, al) => s + al.quantity * al.unitCost, 0);

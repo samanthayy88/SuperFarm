@@ -426,6 +426,53 @@ export interface AppSettings {
 }
 
 // ---------- Root DB ----------
+// ---------- AB Fertilizers (mixed from several Fertilizer products) ----------
+export type AbPart = "A" | "B";
+
+/** One product in the mix: amount in the product's own base unit (kg / g / L ...) for ONE set. */
+export interface AbRecipeLine {
+  itemId: string;
+  quantity: number;
+}
+
+/** The standard recipe each new batch starts from. */
+export interface AbRecipe {
+  A: AbRecipeLine[];
+  B: AbRecipeLine[];
+}
+
+/** One production run. Amounts and costs are fixed at the time, so later recipe or price changes never rewrite history. */
+export interface AbBatch {
+  id: string;
+  date: string;
+  sets: number;
+  /** What was actually used per set in this batch (may differ from the standard recipe). */
+  lines: { part: AbPart; itemId: string; perSet: number; unitCost: number }[];
+  /** Total cost of the ingredients used for the whole batch. */
+  totalCost: number;
+  note?: string;
+}
+
+/** Sets handed from the AB store to a farm. */
+export interface AbDistribution {
+  id: string;
+  date: string;
+  farmId: string;
+  sets: number;
+}
+
+/** Sets applied on a plot; this is the only time AB cost reaches costing. */
+export interface AbUse {
+  id: string;
+  date: string;
+  farmId: string;
+  plotId: string;
+  /** The plot's crop when it was used, so the cost stays with that crop. */
+  cropId: string;
+  sets: number;
+  note?: string;
+}
+
 export interface DB {
   farms: Farm[];
   plots: Plot[];
@@ -452,5 +499,9 @@ export interface DB {
   payments: Payment[];
   usageLogs: UsageLog[];
   applications: ApplicationRecord[];
+  abRecipe: AbRecipe;
+  abBatches: AbBatch[];
+  abDistributions: AbDistribution[];
+  abUses: AbUse[];
   settings: AppSettings;
 }
