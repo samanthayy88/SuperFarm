@@ -74,8 +74,11 @@ export default function SalaryPage() {
       <PageHeader
         title="Salary"
         subtitle="Salary expense for financial reporting — a read-only view of Payroll totals. Manage rates and payslips under People → Payroll."
-        actions={<DateRangeFilter value={range} onChange={setRange} monthly />}
       />
+
+      <Card className="mb-6">
+        <DateRangeFilter value={range} onChange={setRange} monthly />
+      </Card>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Base salary" value={fmtRM0(totalBase)} sub={`${months.length} month(s)`} />

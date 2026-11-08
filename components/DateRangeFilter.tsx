@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtDate } from "@/lib/utils";
+import { Button, Field, TextInput } from "@/components/ui";
 
 /** An inclusive "YYYY-MM-DD" period. A blank end means open-ended, so both blank = all time. */
 export interface DateRange {
@@ -35,6 +36,7 @@ export function rangeLabel(r: DateRange): string {
 }
 
 const PRESETS: { id: string; label: string; range: () => DateRange }[] = [
+  { id: "today", label: "Today", range: () => ({ from: iso(new Date()), to: iso(new Date()) }) },
   {
     id: "last-7",
     label: "Last 7 days",
@@ -53,11 +55,7 @@ const PRESETS: { id: string; label: string; range: () => DateRange }[] = [
       return { from: iso(d), to: iso(new Date()) };
     },
   },
-  {
-    id: "this-month",
-    label: "This month",
-    range: () => monthRange(iso(new Date()).slice(0, 7)),
-  },
+  { id: "this-month", label: "This month", range: () => monthRange(iso(new Date()).slice(0, 7)) },
   {
     id: "last-month",
     label: "Last month",
@@ -69,34 +67,20 @@ const PRESETS: { id: string; label: string; range: () => DateRange }[] = [
     },
   },
   {
-    id: "last-3",
-    label: "Last 3 months",
-    range: () => {
-      const start = new Date();
-      start.setDate(1);
-      start.setMonth(start.getMonth() - 2);
-      return { from: iso(start), to: monthRange(iso(new Date()).slice(0, 7)).to };
-    },
-  },
-  {
     id: "this-year",
     label: "This year",
     range: () => ({ from: `${new Date().getFullYear()}-01-01`, to: `${new Date().getFullYear()}-12-31` }),
   },
-  {
-    id: "last-year",
-    label: "Last year",
-    range: () => ({ from: `${new Date().getFullYear() - 1}-01-01`, to: `${new Date().getFullYear() - 1}-12-31` }),
-  },
-  { id: "all", label: "All time", range: () => ({ from: "", to: "" }) },
+  // "Clear" = no limit at either end, i.e. all time
+  { id: "all", label: "Clear", range: () => ({ from: "", to: "" }) },
 ];
 
-const inputClass =
-  "rounded-full border border-hairline bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25";
+// the Salary page works month by month, so a single day or week makes no sense there
+const MONTHLY_PRESETS = ["this-month", "last-month", "this-year", "all"];
 
 /**
- * Period picker: a preset dropdown plus From / To. In `monthly` mode the two ends are
- * whole months (for the Salary page, which is worked out month by month).
+ * Period picker in the Work Schedule style: From / To boxes with their labels above, and pill
+ * buttons underneath. In `monthly` mode the two ends are whole months (for the Salary page).
  */
 export default function DateRangeFilter({
   value,
@@ -107,52 +91,44 @@ export default function DateRangeFilter({
   onChange: (r: DateRange) => void;
   monthly?: boolean;
 }) {
-  const matched = PRESETS.find((p) => {
-    const r = p.range();
-    return r.from === value.from && r.to === value.to;
-  });
-
+  const presets = monthly ? PRESETS.filter((p) => MONTHLY_PRESETS.includes(p.id)) : PRESETS;
   const setFrom = (v: string) => onChange({ ...value, from: monthly ? (v ? monthRange(v).from : "") : v });
   const setTo = (v: string) => onChange({ ...value, to: monthly ? (v ? monthRange(v).to : "") : v });
   const bad = Boolean(value.from && value.to && value.from > value.to);
+  const type = monthly ? "month" : "date";
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <select
-        value={matched?.id ?? "custom"}
-        onChange={(e) => {
-          const p = PRESETS.find((x) => x.id === e.target.value);
-          if (p) onChange(p.range());
-        }}
-        className={`${inputClass} font-medium`}
-        aria-label="Period"
-      >
-        {PRESETS.map((p) => (
-          <option key={p.id} value={p.id}>{p.label}</option>
-        ))}
-        {!matched && <option value="custom">Custom period</option>}
-      </select>
-      <label className="flex items-center gap-1.5 text-xs text-muted">
-        From
-        <input
-          type={monthly ? "month" : "date"}
-          value={monthly ? value.from.slice(0, 7) : value.from}
-          onChange={(e) => setFrom(e.target.value)}
-          className={inputClass}
-          aria-label="From"
-        />
-      </label>
-      <label className="flex items-center gap-1.5 text-xs text-muted">
-        To
-        <input
-          type={monthly ? "month" : "date"}
-          value={monthly ? value.to.slice(0, 7) : value.to}
-          onChange={(e) => setTo(e.target.value)}
-          className={`${inputClass} ${bad ? "border-critical" : ""}`}
-          aria-label="To"
-        />
-      </label>
-      {bad && <span className="text-xs text-critical">“From” is after “To”.</span>}
+    <div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-44">
+          <Field label="From">
+            <TextInput type={type} value={monthly ? value.from.slice(0, 7) : value.from} onChange={(e) => setFrom(e.target.value)} />
+          </Field>
+        </div>
+        <div className="w-44">
+          <Field label="To">
+            <TextInput
+              type={type}
+              value={monthly ? value.to.slice(0, 7) : value.to}
+              onChange={(e) => setTo(e.target.value)}
+              aria-invalid={bad}
+              style={bad ? { borderColor: "var(--critical)" } : undefined}
+            />
+          </Field>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {presets.map((p) => {
+          const r = p.range();
+          const active = r.from === value.from && r.to === value.to;
+          return (
+            <Button key={p.id} variant={active ? "primary" : "ghost"} onClick={() => onChange(r)}>
+              {p.label}
+            </Button>
+          );
+        })}
+      </div>
+      {bad && <p className="mt-2 text-xs text-critical">“From” is after “To”.</p>}
     </div>
   );
 }

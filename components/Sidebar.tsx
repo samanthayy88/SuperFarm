@@ -32,7 +32,6 @@ const nav = [
   { href: "/applications", label: "Agri Inputs", icon: "❋", group: "Operation" },
 
   { href: "/ab-fertilizers", label: "AB Fertilizers", icon: "⚗", group: "Operation" },
-  { href: "/projects", label: "Setup Projects", icon: "⚒", group: "Operation" },
 
   { href: "/settings/crop-variety", label: "Crop & Variety", icon: "❖", group: "Setting" },
   { href: "/settings/collectors", label: "Collectors", icon: "◫", group: "Setting" },

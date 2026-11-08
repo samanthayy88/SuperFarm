@@ -62,13 +62,12 @@ export default function PurchasesPage() {
       <PageHeader
         title="Purchases"
         subtitle="Upload receipts, link them to stock items and claim personal spend"
-        actions={
-          <>
-            <DateRangeFilter value={range} onChange={setRange} />
-            <Button onClick={() => setShowPurchase(true)}>+ New Purchase / Receipt</Button>
-          </>
-        }
+        actions={<Button onClick={() => setShowPurchase(true)}>+ New Purchase / Receipt</Button>}
       />
+
+      <Card className="mb-6">
+        <DateRangeFilter value={range} onChange={setRange} />
+      </Card>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label={`Purchases — ${label}`} value={fmtRM0(monthPurchases.reduce((s, p) => s + purchaseTotal(p), 0))} sub={`${monthPurchases.length} record(s)`} />

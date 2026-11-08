@@ -143,7 +143,7 @@ export default function ItemForm({
 }
 
 /** Deleting a sub-category is only safe once nothing refers to it and no stock is left. */
-function DeleteItem({ item, onCancel, onDeleted }: { item: InventoryItem; onCancel: () => void; onDeleted: () => void }) {
+export function DeleteItem({ item, onCancel, onDeleted }: { item: InventoryItem; onCancel: () => void; onDeleted: () => void }) {
   const { db } = useStore();
   const lines = db.purchases.reduce((n, p) => n + p.lines.filter((l) => l.itemId === item.id).length, 0);
   const rounds = db.applications.filter((a) => a.products.some((p) => p.itemId === item.id)).length;

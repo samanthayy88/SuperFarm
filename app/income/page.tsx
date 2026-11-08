@@ -155,7 +155,6 @@ export default function IncomePage() {
         subtitle="Record what's picked, then sell it to a collector — kg harvested and kg sold stay linked so nothing is entered twice"
         actions={
           <>
-            <DateRangeFilter value={range} onChange={setRange} />
             {tab === "Harvest Records" ? (
               <Button onClick={() => setHarvestForm({ mode: "add" })}>+ Record Harvest</Button>
             ) : tab === "Sales" ? (
@@ -166,6 +165,10 @@ export default function IncomePage() {
           </>
         }
       />
+
+      <Card className="mb-6">
+        <DateRangeFilter value={range} onChange={setRange} />
+      </Card>
 
       <Card
         title={`Today — ${new Date().toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}

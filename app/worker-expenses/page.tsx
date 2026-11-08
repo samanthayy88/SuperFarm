@@ -48,10 +48,11 @@ export default function WorkerExpensesPage() {
       <PageHeader
         title="Worker Expenses"
         subtitle="Groceries, top-ups, cigarettes and cash advances, with optional salary deduction"
-        actions={
-          <DateRangeFilter value={range} onChange={setRange} />
-        }
       />
+
+      <Card className="mb-6">
+        <DateRangeFilter value={range} onChange={setRange} />
+      </Card>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={`Total expenses — ${label}`} value={fmtRM0(totalSpent)} sub="Groceries, top-ups, cigarettes, advances" />

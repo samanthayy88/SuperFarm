@@ -6,15 +6,16 @@ import { useStore, newId } from "@/lib/store";
 import { PageHeader, Card, Badge, Table, Th, Td, Button, Modal, Field, TextInput, Select, StatCard, Tabs, EmptyState, MonthSelect } from "@/components/ui";
 import { fmtRM, fmtDate, currentMonthKey, monthLabel, lastNMonthKeys, TODAY } from "@/lib/utils";
 import { UsageLog, InventoryItem, StockAllocation } from "@/lib/types";
-import ItemForm from "@/components/ItemForm";
+import ItemForm, { DeleteItem } from "@/components/ItemForm";
 import { isAbItem } from "@/lib/ab";
 import { consumeStock, transferStock, farmBalance, mainBalance, fmtStock, packSizeOf } from "@/lib/stock";
 
 export default function InventoryPage() {
-  const { db } = useStore();
+  const { db, update } = useStore();
   const [tab, setTab] = useState("Inventory");
   const [showUsage, setShowUsage] = useState(false);
   const [itemForm, setItemForm] = useState<{ item?: InventoryItem } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
   const [place, setPlace] = useState("main"); // By Farm tab: "main" or a farm id
   const months = lastNMonthKeys(12).reverse();
@@ -114,6 +115,12 @@ export default function InventoryPage() {
                           className="rounded-full border border-hairline px-3 py-1 text-xs text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
                         >
                           Edit
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(i)}
+                          className="rounded-full border border-hairline px-3 py-1 text-xs text-critical transition-colors hover:bg-critical-soft"
+                        >
+                          Delete
                         </button>
                       </div>
                     </Td>
@@ -325,6 +332,16 @@ export default function InventoryPage() {
 
       {showUsage && <UsageForm onClose={() => setShowUsage(false)} />}
       {itemForm && <ItemForm item={itemForm.item} onClose={() => setItemForm(null)} />}
+      {deleteTarget && (
+        <DeleteItem
+          item={deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onDeleted={() => {
+            update("items", (list) => list.filter((x) => x.id !== deleteTarget.id));
+            setDeleteTarget(null);
+          }}
+        />
+      )}
       {transferItem && <TransferForm item={transferItem} onClose={() => setTransferItem(null)} />}
     </div>
   );

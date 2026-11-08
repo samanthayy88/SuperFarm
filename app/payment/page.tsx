@@ -103,13 +103,12 @@ export default function PaymentPage() {
       <PageHeader
         title="Payment"
         subtitle="Ad-hoc company bills — utilities, transport, professional fees and other one-off costs"
-        actions={
-          <>
-            <DateRangeFilter value={range} onChange={setRange} />
-            <Button onClick={() => setPaymentForm({ mode: "add" })}>+ Record Payment</Button>
-          </>
-        }
+        actions={<Button onClick={() => setPaymentForm({ mode: "add" })}>+ Record Payment</Button>}
       />
+
+      <Card className="mb-6">
+        <DateRangeFilter value={range} onChange={setRange} />
+      </Card>
 
       <MonthlyDues />
 

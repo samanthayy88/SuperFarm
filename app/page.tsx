@@ -88,10 +88,6 @@ export default function Overview() {
     const total = toClaim.reduce((s, p) => s + p.lines.reduce((a, ln) => a + ln.quantity * ln.unitPrice, 0), 0);
     alerts.push({ tone: "warning", tag: "Claim", text: `${toClaim.length} purchase(s) paid from own pocket not yet claimed (${fmtRM0(total)})`, href: "/inventory" });
   }
-  for (const p of db.projects.filter((p) => p.status === "Delayed")) {
-    const farm = db.farms.find((f) => f.id === p.farmId)?.name ?? "?";
-    alerts.push({ tone: "serious", tag: "Project", text: `${p.jobType} at ${farm} by ${p.contractor} is delayed (expected ${fmtDate(p.expectedEndDate)})`, href: "/projects" });
-  }
   const toneRank = { critical: 0, serious: 1, warning: 2 };
   alerts.sort((a, b) => toneRank[a.tone] - toneRank[b.tone]);
 
