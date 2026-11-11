@@ -390,6 +390,7 @@ export default function IncomePage() {
           value={`${wasteRows.reduce((s, w) => s + w.quantityKg, 0).toLocaleString()} kg`}
           tone={wasteRows.length > 0 ? "critical" : undefined}
           sub={`${wasteRows.length} record(s)`}
+          action={{ label: "View / edit / delete", onClick: () => setTab("Wastage") }}
         />
       </div>
 

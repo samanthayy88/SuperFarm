@@ -322,7 +322,8 @@ export interface PayrollLine {
 
 export function computePayroll(db: DB, month: string): PayrollLine[] {
   return db.workers
-    .filter((w) => w.active)
+    // a worker who resigned still gets their final month's pay
+    .filter((w) => w.active || (w.resignDate && w.resignDate.slice(0, 7) >= month))
     .map((w) => {
       const harvests = db.harvests.filter(
         (h) => h.workerId === w.id && h.date.startsWith(month)

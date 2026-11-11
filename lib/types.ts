@@ -144,7 +144,10 @@ export interface Worker {
   joinDate: string;
   baseSalary: number;
   farmId: string; // farm in charge
+  /** false = resigned / archived: hidden from the Workers list and pickers, listed in the Archive tab. */
   active: boolean;
+  /** Last day of work, set when the worker resigns. */
+  resignDate?: string;
 }
 
 /**

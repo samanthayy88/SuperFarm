@@ -53,11 +53,14 @@ export function StatCard({
   value,
   sub,
   tone,
+  action,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: "good" | "warning" | "critical";
+  /** Optional pill link under the figure, e.g. to the page that manages these records. */
+  action?: { label: string; onClick: () => void };
 }) {
   const toneClass =
     tone === "good"
@@ -72,6 +75,14 @@ export function StatCard({
       <p className="text-sm text-ink-2">{label}</p>
       <p className={`mt-2 text-xl font-medium tracking-tight tnum break-words sm:mt-3 sm:text-3xl ${toneClass}`}>{value}</p>
       {sub && <p className="mt-1.5 text-xs text-muted">{sub}</p>}
+      {action && (
+        <button
+          onClick={action.onClick}
+          className="mt-2.5 rounded-full border border-hairline px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-surface-2"
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }

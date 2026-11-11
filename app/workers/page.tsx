@@ -27,7 +27,7 @@ import VarietySelect from "@/components/VarietySelect";
 export default function WorkersPage() {
   const { db, setDB } = useStore();
   const [tab, setTab] = useState("Workers");
-  const [workerForm, setWorkerForm] = useState<{ mode: "add" } | { mode: "edit"; worker: Worker } | null>(null);
+  const [workerForm, setWorkerForm] = useState<{ mode: "add"; resigned?: boolean } | { mode: "edit"; worker: Worker } | null>(null);
   const [deleteWorker, setDeleteWorker] = useState<Worker | null>(null);
 
   const workerImpacts = (w: Worker) => {
@@ -55,18 +55,94 @@ export default function WorkersPage() {
   const activeWorkers = db.workers.filter((w) => w.active).length;
   const managedPlots = deleteWorker ? db.plots.filter((p) => p.workerIds.includes(deleteWorker.id)).length : 0;
 
+  const renderList = (list: Worker[], empty: string) =>
+    list.length === 0 ? (
+      <Card>
+        <EmptyState message={empty} />
+      </Card>
+    ) : (
+      <div className="space-y-4">
+        {list.map((w) => {
+          const farm = db.farms.find((f) => f.id === w.farmId)?.name ?? "—";
+          const plots = db.plots.filter((p) => p.workerIds.includes(w.id));
+          return (
+            <Card
+              key={w.id}
+              title={w.name}
+              actions={
+                <div className="flex gap-2">
+                  <Button small variant="ghost" onClick={() => setWorkerForm({ mode: "edit", worker: w })}>
+                    Edit
+                  </Button>
+                  <Button small variant="danger" onClick={() => setDeleteWorker(w)}>
+                    Delete
+                  </Button>
+                </div>
+              }
+            >
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-ink-2">
+                <span>
+                  <span className="text-muted">ID/Passport:</span> {w.idNumber || "—"}
+                </span>
+                {w.dob && (
+                  <span>
+                    <span className="text-muted">DOB:</span> {fmtDate(w.dob)}
+                  </span>
+                )}
+                <span>
+                  <span className="text-muted">Phone:</span> {w.phone || "—"}
+                </span>
+                <span>
+                  <span className="text-muted">Nationality:</span> {w.nationality || "—"}
+                </span>
+                <span>
+                  <span className="text-muted">Joined:</span> {fmtDate(w.joinDate)}
+                </span>
+                {!w.active && (
+                  <span>
+                    <span className="text-muted">Resigned:</span> {w.resignDate ? fmtDate(w.resignDate) : "—"}
+                  </span>
+                )}
+                <span>
+                  <span className="text-muted">Base salary:</span> {fmtRM(w.baseSalary)}
+                </span>
+                <span>
+                  <span className="text-muted">Farm in charge:</span> {farm}
+                </span>
+                {w.active && (
+                  <span>
+                    <span className="text-muted">Plot(s) in charge:</span>{" "}
+                    {plots.length > 0
+                      ? plots
+                          .map((p) => `${db.farms.find((f) => f.id === p.farmId)?.name?.split(" ")[0]} ${p.name}`)
+                          .join(", ")
+                      : "—"}
+                  </span>
+                )}
+                {!w.active && <Badge tone="neutral">Resigned</Badge>}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    );
+
   return (
     <div>
       <PageHeader
         title="My Workers"
         subtitle="Worker profiles, harvest commission settings and harvest targets"
         actions={
-          tab === "Workers" ? <Button onClick={() => setWorkerForm({ mode: "add" })}>+ Add Worker</Button> : undefined
+          tab === "Workers" ? (
+            <Button onClick={() => setWorkerForm({ mode: "add" })}>+ Add Worker</Button>
+          ) : tab === "Archive" ? (
+            <Button onClick={() => setWorkerForm({ mode: "add", resigned: true })}>+ Add to Archive</Button>
+          ) : undefined
         }
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Active workers" value={String(activeWorkers)} sub={`${db.workers.length} total`} />
+        <StatCard label="Active workers" value={String(activeWorkers)} sub={`${db.workers.length - activeWorkers} resigned`} />
         <StatCard label="Farms represented" value={String(new Set(db.workers.map((w) => w.farmId)).size)} />
         <StatCard
           label="Commission settings"
@@ -76,72 +152,19 @@ export default function WorkersPage() {
         <StatCard label="Harvest targets" value={String(db.harvestTargets.length)} sub="Being tracked" />
       </div>
 
-      <Tabs tabs={["Workers", "Commission Settings", "Harvest Targets"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["Workers", "Commission Settings", "Harvest Targets", "Archive"]} active={tab} onChange={setTab} />
 
-      {tab === "Workers" &&
-        (db.workers.length === 0 ? (
-          <Card>
-            <EmptyState message="No workers yet. Use “+ Add Worker” to add your first one." />
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {db.workers.map((w) => {
-              const farm = db.farms.find((f) => f.id === w.farmId)?.name ?? "—";
-              const plots = db.plots.filter((p) => p.workerIds.includes(w.id));
-              return (
-                <Card
-                  key={w.id}
-                  title={w.name}
-                  actions={
-                    <div className="flex gap-2">
-                      <Button small variant="ghost" onClick={() => setWorkerForm({ mode: "edit", worker: w })}>
-                        Edit
-                      </Button>
-                      <Button small variant="danger" onClick={() => setDeleteWorker(w)}>
-                        Delete
-                      </Button>
-                    </div>
-                  }
-                >
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-ink-2">
-                    <span>
-                      <span className="text-muted">ID/Passport:</span> {w.idNumber || "—"}
-                    </span>
-                    {w.dob && (
-                      <span>
-                        <span className="text-muted">DOB:</span> {fmtDate(w.dob)}
-                      </span>
-                    )}
-                    <span>
-                      <span className="text-muted">Phone:</span> {w.phone || "—"}
-                    </span>
-                    <span>
-                      <span className="text-muted">Nationality:</span> {w.nationality || "—"}
-                    </span>
-                    <span>
-                      <span className="text-muted">Joined:</span> {fmtDate(w.joinDate)}
-                    </span>
-                    <span>
-                      <span className="text-muted">Base salary:</span> {fmtRM(w.baseSalary)}
-                    </span>
-                    <span>
-                      <span className="text-muted">Farm in charge:</span> {farm}
-                    </span>
-                    <span>
-                      <span className="text-muted">Plot(s) in charge:</span>{" "}
-                      {plots.length > 0
-                        ? plots
-                            .map((p) => `${db.farms.find((f) => f.id === p.farmId)?.name?.split(" ")[0]} ${p.name}`)
-                            .join(", ")
-                        : "—"}
-                    </span>
-                    {!w.active && <Badge tone="neutral">Inactive</Badge>}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        ))}
+      {tab === "Workers" && renderList(db.workers.filter((w) => w.active), "No workers yet. Use “+ Add Worker” to add your first one.")}
+
+      {tab === "Archive" && (
+        <>
+          <p className="mb-4 text-sm text-muted">
+            Workers who have resigned. They are left out of payroll (after their last month), the schedule and plot pickers, but their
+            past harvests and records are kept. Edit a worker and untick “Resigned” to bring them back.
+          </p>
+          {renderList(db.workers.filter((w) => !w.active), "No resigned workers. Tick “Resigned” on a worker to move them here, or use “+ Add to Archive”.")}
+        </>
+      )}
 
       {tab === "Commission Settings" && <CommissionSettingsTab />}
       {tab === "Harvest Targets" && <HarvestTargetsTab />}
@@ -149,6 +172,7 @@ export default function WorkersPage() {
       {workerForm && (
         <WorkerForm
           worker={workerForm.mode === "edit" ? workerForm.worker : undefined}
+          startResigned={workerForm.mode === "add" && workerForm.resigned}
           onClose={() => setWorkerForm(null)}
         />
       )}
@@ -172,7 +196,7 @@ export default function WorkersPage() {
 
 /* -------------------------------- worker form ------------------------------ */
 
-function WorkerForm({ worker, onClose }: { worker?: Worker; onClose: () => void }) {
+function WorkerForm({ worker, startResigned, onClose }: { worker?: Worker; startResigned?: boolean; onClose: () => void }) {
   const { db, update } = useStore();
   const editing = Boolean(worker);
   const [form, setForm] = useState({
@@ -184,7 +208,8 @@ function WorkerForm({ worker, onClose }: { worker?: Worker; onClose: () => void 
     joinDate: worker?.joinDate ?? new Date().toISOString().slice(0, 10),
     baseSalary: worker ? String(worker.baseSalary) : "",
     farmId: worker?.farmId ?? db.farms[0]?.id ?? "",
-    active: worker?.active ?? true,
+    resigned: worker ? !worker.active : Boolean(startResigned),
+    resignDate: worker?.resignDate ?? "",
   });
 
   const submit = () => {
@@ -198,7 +223,8 @@ function WorkerForm({ worker, onClose }: { worker?: Worker; onClose: () => void 
       joinDate: form.joinDate,
       baseSalary: Number(form.baseSalary) || 0,
       farmId: form.farmId,
-      active: form.active,
+      active: !form.resigned,
+      resignDate: form.resigned ? form.resignDate || new Date().toISOString().slice(0, 10) : undefined,
     };
     if (worker) {
       update("workers", (list) => list.map((w) => (w.id === worker.id ? { ...w, ...payload } : w)));
@@ -247,16 +273,21 @@ function WorkerForm({ worker, onClose }: { worker?: Worker; onClose: () => void 
             ))}
           </Select>
         </Field>
-        {editing && (
-          <label className="flex items-center gap-2 text-sm text-ink-2">
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              className="accent-[var(--accent)]"
-            />
-            Active (included in payroll)
-          </label>
+        <label className="flex items-center gap-2 text-sm text-ink-2">
+          <input
+            type="checkbox"
+            checked={form.resigned}
+            onChange={(e) =>
+              setForm({ ...form, resigned: e.target.checked, resignDate: e.target.checked && !form.resignDate ? new Date().toISOString().slice(0, 10) : form.resignDate })
+            }
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          Resigned (moves to the Archive tab)
+        </label>
+        {form.resigned && (
+          <Field label="Last day of work">
+            <TextInput type="date" value={form.resignDate} onChange={(e) => setForm({ ...form, resignDate: e.target.value })} />
+          </Field>
         )}
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>
