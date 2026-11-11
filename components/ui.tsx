@@ -68,9 +68,9 @@ export function StatCard({
           ? "text-critical"
           : "text-ink";
   return (
-    <div className="rounded-card border border-hairline bg-surface p-5 shadow-card">
+    <div className="min-w-0 rounded-card border border-hairline bg-surface p-4 shadow-card sm:p-5">
       <p className="text-sm text-ink-2">{label}</p>
-      <p className={`mt-3 text-3xl font-medium tracking-tight tnum ${toneClass}`}>{value}</p>
+      <p className={`mt-2 text-xl font-medium tracking-tight tnum break-words sm:mt-3 sm:text-3xl ${toneClass}`}>{value}</p>
       {sub && <p className="mt-1.5 text-xs text-muted">{sub}</p>}
     </div>
   );
@@ -147,7 +147,7 @@ export function Button({
   type?: "button" | "submit";
   small?: boolean;
 }) {
-  const base = small ? "px-3.5 py-1.5 text-xs" : "px-5 py-2.5 text-sm";
+  const base = small ? "px-3.5 py-2.5 text-xs sm:py-1.5" : "px-5 py-3 text-sm sm:py-2.5";
   // filled periwinkle pill for the main action, outlined pill for the rest (as the "Try for free" / "Request demo" pair)
   const style =
     variant === "primary"
@@ -214,7 +214,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 export const inputClass =
-  "w-full rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none";
+  "w-full rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-base text-ink sm:text-sm placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputClass} />;

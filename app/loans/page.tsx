@@ -55,7 +55,7 @@ export default function LoansPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total borrowed" value={fmtRM0(totalBorrowed)} />
         <StatCard label="Estimated balance" value={fmtRM0(totalBalance)} sub="Principal minus installments paid" />
         <StatCard label={`Installments due — ${monthLabel(month)}`} value={fmtRM0(monthlyDue)} />

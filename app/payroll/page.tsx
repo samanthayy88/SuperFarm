@@ -41,7 +41,7 @@ export default function PayrollPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label={`Total payout — ${monthLabel(month)}`} value={fmtRM0(totalNet)} />
         <StatCard label="Commission earned" value={fmtRM0(totalCommission)} sub={`${totalKg.toLocaleString()} kg harvested`} />
         <StatCard label="Deductions" value={fmtRM0(totalDeductions)} sub="Groceries, advances, top-ups" tone={totalDeductions > 0 ? "warning" : undefined} />

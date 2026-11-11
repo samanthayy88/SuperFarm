@@ -44,7 +44,7 @@ const groups = ["Overview", "My Farm", "People", "Loans", "Income", "Expenses", 
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { db, resetData } = useStore();
+  const { db, resetData, logout, mode } = useStore();
   const { appName, appSubtitle, logoDataUrl } = db.settings;
   // drawer state; only applies below the lg breakpoint (nav links close it on click)
   const [open, setOpen] = useState(false);
@@ -159,6 +159,14 @@ export default function Sidebar() {
           >
             ↺ Reset sample data
           </button>
+          {mode === "server" && (
+            <button
+              onClick={logout}
+              className="w-full rounded-full px-3.5 py-2 text-left text-xs text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink"
+            >
+              ⎋ Log out
+            </button>
+          )}
         </div>
       </aside>
     </>

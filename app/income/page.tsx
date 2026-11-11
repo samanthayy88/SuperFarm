@@ -180,7 +180,7 @@ export default function IncomePage() {
           </div>
         }
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Harvested today" value={`${todayHarvestKg.toLocaleString()} kg`} sub={`${todayHarvests.length} record(s) · ${fmtRM(todayCommission)} commission`} />
           <StatCard label="Sold today" value={`${todaySaleKg.toLocaleString()} kg`} sub={`${todaySales.length} sale(s)`} tone={todaySaleKg > 0 ? "good" : undefined} />
           <StatCard
@@ -292,7 +292,7 @@ export default function IncomePage() {
 
       {showOverview && (
         <div className="mb-6">
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total harvested" value={`${vol.harvested.toLocaleString()} kg`} sub="All time, all crops" />
         <StatCard label="Total sold" value={`${vol.sold.toLocaleString()} kg`} sub={pctOf(vol.sold)} tone="good" />
         <StatCard
@@ -303,7 +303,7 @@ export default function IncomePage() {
         />
         <StatCard label="Written off (rotten / lost)" value={`${vol.wasted.toLocaleString()} kg`} sub={`${pctOf(vol.wasted)} — cost absorbed by the farm`} tone={vol.wasted > 0 ? "critical" : undefined} />
       </div>
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2">
         <StatCard label="Outstanding receivables" value={fmtRM0(receivables)} sub={`${pending.length} sale(s) unpaid`} tone={receivables > 0 ? "warning" : "good"} />
         <StatCard label="Overdue payments" value={String(overdue.length)} tone={overdue.length > 0 ? "critical" : "good"} sub="Past collector payment term" />
       </div>
@@ -465,7 +465,7 @@ export default function IncomePage() {
 
       {tab === "Daily Stock" && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
             <StatCard label={`Harvested today — ${fmtDate(today)}`} value={`${todayHarvested.toLocaleString()} kg`} />
             <StatCard label="Sold today" value={`${todaySold.toLocaleString()} kg`} tone={todaySold > 0 ? "good" : undefined} />
             <StatCard

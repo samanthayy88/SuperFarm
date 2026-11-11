@@ -101,7 +101,7 @@ export default function FarmCosting() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Total cost" value={fmtRM0(res.totalCost)} sub={`${fmtRM0(res.acres > 0 ? res.totalCost / res.acres : 0)} per acre`} />
             <StatCard label="Revenue (sold)" value={fmtRM0(res.revenue)} sub={`${kg0(res.soldKg)} kg sold`} />
             <StatCard

@@ -145,7 +145,7 @@ export default function FarmsPage() {
         actions={<Button onClick={() => setFarmForm({ mode: "add" })}>+ Add Farm</Button>}
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Farms" value={String(db.farms.length)} sub={`${totalAcres} acres total`} />
         <StatCard label="Plots" value={String(db.plots.length)} sub={`${activePlots} currently active`} />
         <StatCard

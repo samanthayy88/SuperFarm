@@ -173,7 +173,7 @@ export default function AbFertilizersPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Sets produced" value={produced.toLocaleString()} sub={`${db.abBatches.length} batch(es)`} />
         <StatCard label="In AB store" value={main.toLocaleString()} sub="not yet given to a farm" />
         <StatCard label="With farms" value={withFarms.toLocaleString()} sub="given, not yet used" />

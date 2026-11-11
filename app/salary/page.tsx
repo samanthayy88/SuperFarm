@@ -80,7 +80,7 @@ export default function SalaryPage() {
         <DateRangeFilter value={range} onChange={setRange} monthly />
       </Card>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Base salary" value={fmtRM0(totalBase)} sub={`${months.length} month(s)`} />
         <StatCard label="Harvest commission" value={fmtRM0(totalCommission)} />
         <StatCard label={`Total salary expense — ${label}`} value={fmtRM0(totalNet + totalDeductions)} sub="Before worker-expense deductions" />

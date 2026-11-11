@@ -65,7 +65,7 @@ export default function WorkersPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Active workers" value={String(activeWorkers)} sub={`${db.workers.length} total`} />
         <StatCard label="Farms represented" value={String(new Set(db.workers.map((w) => w.farmId)).size)} />
         <StatCard

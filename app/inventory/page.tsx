@@ -41,7 +41,7 @@ export default function InventoryPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Stock value" value={fmtRM(stockValue)} sub={`${db.items.length} tracked items`} />
         <StatCard label="Items low / out of stock" value={String(lowStock.length)} tone={lowStock.length > 0 ? "critical" : "good"} />
         <StatCard label={`Usage logged — ${monthLabel(month)}`} value={String(monthUsage.length)} />
@@ -159,7 +159,7 @@ export default function InventoryPage() {
                 );
               })}
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
               <StatCard label="Items held" value={String(held.length)} sub={places.find((x) => x.id === place)?.label} />
               <StatCard label="Stock value here" value={fmtRM(value)} />
               <StatCard

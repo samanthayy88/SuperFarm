@@ -70,7 +70,7 @@ function FarmAnalysis() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Farms" value={String(db.farms.length)} />
         <StatCard label="Plots" value={String(db.plots.length)} sub={`${activePlots} active`} />
         <StatCard label="Total acreage" value={`${totalAcres.toLocaleString()} acres`} />
@@ -156,7 +156,7 @@ function FinancialAnalysis({ month }: { month: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label={`Income — 6 months ending ${monthLabel(month)}`} value={fmtRM0(totalIncome6mo)} />
         <StatCard label={`Expenses — 6 months ending ${monthLabel(month)}`} value={fmtRM0(totalExpense6mo)} />
         <StatCard
@@ -212,7 +212,7 @@ function WorkerAnalysis({ month }: { month: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total kg harvested" value={totalKg.toLocaleString()} />
         <StatCard label="Total commission paid" value={fmtRM0(totalCommission)} />
         <StatCard
@@ -273,7 +273,7 @@ function ApplicationAnalysis({ month }: { month: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label={`Rounds — ${monthLabel(month)}`} value={String(rounds.length)} />
         <StatCard label="Total input cost" value={fmtRM0(totalCost)} />
         <StatCard label="Average cost / round" value={fmtRM(avgCost)} />

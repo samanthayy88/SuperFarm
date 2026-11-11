@@ -141,13 +141,13 @@ export default function CropCosting() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Total production cost" value={fmtRM0(res.totalCost)} sub="Workers + rent + utilities + inputs" />
             <StatCard label="Harvested" value={`${harvested.toLocaleString()} kg`} sub={`${kg0(res.soldKg)} kg sold · ${kg0(res.unsoldKg)} in store · ${kg0(res.wastedKg)} written off`} />
             <StatCard label={`Production cost per kg ${cropName}`} value={harvested > 0 ? fmtRM(res.costPerKg) : "—"} sub="Total cost ÷ kg harvested" />
             <StatCard label="Revenue (sold)" value={fmtRM0(res.revenue)} sub={res.avgPrice > 0 ? `Avg ${fmtRM(res.avgPrice)}/kg` : "No sales in period"} />
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label={money ? "Profit" : "Loss"}
               value={res.revenue === 0 ? "—" : fmtRM0(res.profit)}
@@ -169,7 +169,7 @@ export default function CropCosting() {
           </div>
 
           {(res.wastedKg > 0 || res.soldKg > 0) && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
               <StatCard
                 label="Written off (rotten / lost)"
                 value={`${kg0(res.wastedKg)} kg`}

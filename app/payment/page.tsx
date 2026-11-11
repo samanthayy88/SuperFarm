@@ -112,7 +112,7 @@ export default function PaymentPage() {
 
       <MonthlyDues />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label={`Total paid — ${label}`} value={fmtRM0(totalSpent)} sub={`${monthPayments.length} payment${monthPayments.length === 1 ? "" : "s"}`} />
         <StatCard label="Bills & other payments" value={fmtRM0(billsTotal)} />
         <StatCard label="Farm rent & loan repayments" value={fmtRM0(rentLoanTotal)} sub="Added automatically from Rental Contracts and Borrowings" />

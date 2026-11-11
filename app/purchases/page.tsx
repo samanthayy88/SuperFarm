@@ -69,7 +69,7 @@ export default function PurchasesPage() {
         <DateRangeFilter value={range} onChange={setRange} />
       </Card>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label={`Purchases — ${label}`} value={fmtRM0(monthPurchases.reduce((s, p) => s + purchaseTotal(p), 0))} sub={`${monthPurchases.length} record(s)`} />
         <StatCard label="Claims outstanding" value={fmtRM0(claimPendingTotal)} sub={`${toClaim.length} not yet submitted`} tone={claimPendingTotal > 0 ? "warning" : "good"} />
         <StatCard label={`Vendors used — ${label}`} value={String(monthVendors)} />
@@ -223,7 +223,7 @@ interface DraftLine {
   splits?: DraftSplit[];
 }
 
-const lineClass = "rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm";
+const lineClass = "rounded-lg border border-hairline bg-surface px-2.5 py-2 text-base sm:text-sm";
 
 function PurchaseForm({ purchase, onClose }: { purchase?: Purchase; onClose: () => void }) {
   const { db, setDB } = useStore();
